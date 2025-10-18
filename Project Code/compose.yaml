@@ -1,43 +1,39 @@
+version: "3.9"
+
 services:
   backend:
     build: ./backend
     container_name: backend
-    restart: unless-stopped
     ports:
       - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - PORT=8000
     volumes:
-      - ./backend/app:/app
-    env_file: .env
-    depends_on:
-      - db
+      - ./backend:/app
+      - /app/node_modules
     networks:
       - app-network
 
   frontend:
     build: ./frontend
     container_name: frontend
-    restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file: .env
-    networks:
-      - app-network
-
-  db:
-    image: postgres
-    container_name: postgres
-    restart: unless-stopped
-    env_file: .env
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=http://localhost:8000
     volumes:
-      - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - ./frontend:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    depends_on:
+      - backend
     networks:
       - app-network
 
 networks:
   app-network:
-
-volumes:
-  db_data:
+    driver: bridge
 
