@@ -18,6 +18,6 @@ This chart tracks weekly meeting attendance.
 | 10 | Oct 24 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 11 | Oct 27 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 12 | Nov 3 |  |  |  |  |  |  |  |  |
-| 12 | Nov 7 |  |  |  |  |  |  |  |  |
+| 12 | Nov 7 | ✅  |  | ✅  | ✅ |  |  |  | ✅  |
 
 ---
