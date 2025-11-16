@@ -7,7 +7,7 @@ This chart tracks weekly meeting attendance.
 ---
 
 | Week | Date       | Meeting type   | Harumi | Jerry | Cameron | Renata | Xavier | Laura | Robert | Kyle |
-|:----:|:-----------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
+|:----:|:-----------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
 | 1 | Sep 10  | Team | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 2 | Sep 17 | Team | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 3 | Sep 22 | TA | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -19,7 +19,7 @@ This chart tracks weekly meeting attendance.
 | 10 | Oct 20 | TA | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 10 | Oct 24 | Sponsor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 11 | Oct 27 | Team | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 12 | Nov 5 | Team| ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 12 | Nov 5 | Team | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 12 | Nov 7 | Hardware Team | ✅  |  | ✅  | ✅ |  |  |  | ✅  |
 | 13 | Nov 10 | Team | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 13 | Nov 12 | CultureCamp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
