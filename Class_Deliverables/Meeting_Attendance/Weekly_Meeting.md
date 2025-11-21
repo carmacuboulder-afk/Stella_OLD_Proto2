@@ -24,5 +24,6 @@ This chart tracks weekly meeting attendance.
 | 13 | Nov 10 | Team | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 13 | Nov 12 | CultureCamp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 14 | Nov 17 | TA | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 14 | Nov 19 | Team | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
