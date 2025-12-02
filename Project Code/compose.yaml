@@ -1,4 +1,19 @@
 services:
+  db:
+    image: postgres:15
+    container_name: db
+    environment:
+      POSTGRES_USER: stella_user
+      POSTGRES_PASSWORD: stella
+      POSTGRES_DB: stella_db
+    volumes:
+      - ./backend/db.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
   backend:
     build: ./backend
     container_name: backend
@@ -7,9 +22,16 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=8000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=stella_user
+      - DB_PASSWORD=stella
+      - DB_NAME=stella_db
     volumes:
       - ./backend:/app
       - /app/node_modules
+    depends_on:
+      - db
     networks:
       - app-network
 
@@ -30,6 +52,9 @@ services:
       - backend
     networks:
       - app-network
+
+volumes:
+  postgres_data:
 
 networks:
   app-network:
