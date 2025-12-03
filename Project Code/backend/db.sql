@@ -6,6 +6,8 @@ CREATE TABLE users (
   role VARCHAR(20) NOT NULL DEFAULT 'user'
     CHECK (role IN ('user', 'admin')),
   password_hash VARCHAR(255) NOT NULL,
+  school VARCHAR(255),
+  organization VARCHAR(255),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
