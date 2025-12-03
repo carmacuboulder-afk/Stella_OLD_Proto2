@@ -28,7 +28,6 @@ function App() {
 
 export default App; */
 
-import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
@@ -36,6 +35,9 @@ import Data from "./pages/Data";
 import Map from "./pages/Map";
 import About from "./pages/About";
 import FAQ from "./pages/FAQ";
+import Doc from "./pages/Doc";
+import Footer from "./components/Footer";
+
 
 
 function App() {
@@ -48,7 +50,9 @@ function App() {
         <Route path="/data" element={<Data />} />
         <Route path="/map" element={<Map />} />
         <Route path="/faq" element={<FAQ />} />
+        <Route path="/doc" element={<Doc />} />
       </Routes>
+      <Footer></Footer>
     </Router>
   );
 }
