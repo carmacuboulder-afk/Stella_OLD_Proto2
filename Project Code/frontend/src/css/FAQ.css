@@ -9,5 +9,21 @@
 
 h1 {
     font-weight: bolder;
-    text-shadow: 2px 2px 2px gray;
+    text-shadow: 0px 1px 2px gray;
+}
+
+h2 {
+    font-weight: bold;
+    margin-top: 2rem;
+}
+
+ul {
+  list-style-type: disc;
+  margin-left: 1.5rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+}
+
+p {
+    font-weight: lighter;
 }

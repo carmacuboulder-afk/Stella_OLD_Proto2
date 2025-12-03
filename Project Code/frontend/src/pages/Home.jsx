@@ -1,5 +1,4 @@
 import "../css/Home.css";
-import heroImg from "../img/background_hero.png";
 import backgroundImg from "../img/background.jpg";
 import StellaDevice from "../img/stellaSpin.gif";
 import placeholder from "../img/placeholder.jpg";
@@ -42,6 +41,9 @@ function Home() {
             STELLA can detect signs of plant stress
             before they're visible to the human eye.
           </p>
+          <br></br>
+
+          <a href ="./Doc" style={{ fontWeight: "200", fontFamily: "Times New Romace" }}>How to build a STELLA device </a>
         </div>
 
         <div className="home-about-image">
