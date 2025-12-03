@@ -1,0 +1,155 @@
+/* Push content below navbar if your Navbar is fixed at the top */
+.home {
+    margin-top: 70px;
+    font-family: "Stack Sans Text", sans-serif;
+}
+
+.hero-container {
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1.0) 75%, transparent 100%);
+}
+
+.hero {
+    height: 85vh;
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    font-family: "Stack Sans Text", sans-serif;
+}
+
+.hero-overlay {
+    text-align: center;
+    color: white;
+    padding: 20px;
+    text-shadow: 2px 2px 20px black;
+}
+
+.hero-title {
+    font-size: 2.5rem;
+    font-weight: 600;
+}
+
+.hero-text {
+    margin-top: 10px;
+    font-size: 1.8rem;
+}
+
+.hero-buttons {
+    margin-top: 80px;
+    display: flex;
+    justify-content: center;
+    gap: 100px;
+}
+
+.hero-buttons button {
+    border: none;
+    border-radius: 25px;
+    padding: 24px 36px;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    font-size: 0.95rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    font-family: "Stack Sans Text", sans-serif;
+}
+
+/* about */
+
+
+.home-about {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 40px 150px;
+    gap: 40px;
+}
+
+.home-about-text {
+    max-width: 58vw;
+    font-size: 1.4rem;
+    line-height: 3rem;
+    
+}
+
+.home-about h2 {
+    margin-top: 60px;
+    margin-bottom: 12px;
+}
+
+.home-about-image img {
+  max-width: 600px;
+  max-height: 350px;
+}
+
+.home-about-image p {
+    font-family:'Times New Roman', Times, serif;
+    text-align: center;
+    margin-top: 15px;
+}
+
+.divider {
+    max-width: 85vw;
+    border: 3px solid #333;
+    opacity: 20%;
+}
+
+.home-about a {
+  color: #0000ee;             
+  text-decoration: underline; 
+}
+
+/* import data content */
+.home-importData {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 40px 150px;
+    gap: 200px;
+}
+
+.importData-content h3 {
+    font-weight: normal;
+    font-size: 1.4rem;
+    line-height: 3rem;
+    max-width: 60vw;
+    padding: 25px;
+
+}
+
+.importData-content h2 {
+    font-size: 1.4rem;
+    line-height: 3rem;
+    max-width: 50vw;
+    padding: 25px;
+}
+
+.importData-content p {
+    font-size: 1.4rem;
+    line-height: 3rem;
+    max-width: 50vw;
+    padding: 25px;
+}
+
+.importData-content a {
+  color: #0000ee;             
+  text-decoration: underline; 
+}
+
+
+.importData-image img{
+    margin-top: 30px;
+    max-width: 600px;
+    max-height: 450px;
+    margin: 40px;
+}
+
+/* cards */
+.home-cards {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 40px 50px;
+    gap: 10px;
+}
