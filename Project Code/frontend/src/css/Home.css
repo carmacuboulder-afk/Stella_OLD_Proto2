@@ -1,5 +1,5 @@
 .home {
-    font-family: "Stack Sans Text", sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 .hero-container {
@@ -14,7 +14,6 @@
     justify-content: center;
     align-items: center;
     position: relative;
-    font-family: "Stack Sans Text", sans-serif;
 }
 
 .hero-overlay {
@@ -50,7 +49,6 @@
     cursor: pointer;
     font-size: 0.95rem;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    font-family: "Stack Sans Text", sans-serif;
 }
 
 /* about */
@@ -68,7 +66,6 @@
     max-width: 58vw;
     font-size: 1.4rem;
     line-height: 3rem;
-    
 }
 
 .home-about h2 {
@@ -103,8 +100,8 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 40px 150px;
-    gap: 200px;
+    padding: 40px 130px;
+    gap: 130px;
 }
 
 .importData-content h3 {
@@ -120,15 +117,25 @@
     font-size: 1.4rem;
     line-height: 2rem;
     max-width: 50vw;
-    padding: 25px;
+    padding-left: 25px;
+    margin-top: 20px;
+    font-weight: bold;
+}
+
+.importData-content li {
+    font-size: 1.3rem;
+    line-height: 3rem;
+    max-width: 50vw;
+    padding-left: 25px;
+    margin-top: 20px;
+    font-weight: 550;
 }
 
 .importData-content p {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     line-height: 3rem;
     max-width: 50vw;
-    padding: 25px;
-    font-weight: lighter;
+    padding-left: 48px;
 }
 
 .importData-content a {
@@ -138,10 +145,9 @@
 
 
 .importData-image img{
-    margin-top: 30px;
+    margin-top: 75px;
     max-width: 600px;
     max-height: 450px;
-    margin: 40px;
 }
 
 .home-cards {
@@ -149,7 +155,7 @@
     justify-content: space-between;
     align-items: flex-start;
     padding: 40px 50px;
-    gap: 10px;
+    gap: 25px;
 }
 
 .home-cards h5 {
@@ -159,4 +165,8 @@
 
 .home-cards p {
     font-weight: 200;
+}
+
+.hom button {
+    color: oklch(95% 0.052 163.051);
 }

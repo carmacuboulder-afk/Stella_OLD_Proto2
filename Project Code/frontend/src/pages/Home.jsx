@@ -1,7 +1,9 @@
 import "../css/Home.css";
 import backgroundImg from "../img/background.jpg";
 import StellaDevice from "../img/stellaSpin.gif";
+import importData from "../img/import_data.png";
 import placeholder from "../img/placeholder.jpg";
+
 
 
 function Home() {
@@ -24,7 +26,7 @@ function Home() {
             <div className="hero-buttons">
               <a href="./Data"><button>Upload Your Data</button></a>
               <a href="./Map"><button>View Live Map</button></a>
-              <a href="./Doc"><button>Learn More</button></a>
+              <a href="./FAQ"><button>Learn More</button></a>
             </div>
           </div>
         </section>
@@ -43,7 +45,7 @@ function Home() {
           </p>
           <br></br>
 
-          <a href ="./Doc" style={{ fontWeight: "200", fontFamily: "Times New Romace" }}>How to build a STELLA device </a>
+          <a href ="./Docs" style={{ fontWeight: "200", fontFamily: "Times New Romace" }}>How to build a STELLA device </a>
         </div>
 
         <div className="home-about-image">
@@ -58,21 +60,27 @@ function Home() {
       <section className="home-importData">
         <div className="importData-content">
           <h3>Data gathered by STELLA spectrometers can be visualized and analyzed 
-            from <a href="./Data.js">Data Page</a>, revealing details about the environment 
+            from <a href="./Data">Data Page</a>, revealing details about the environment 
             that go beyond human sight.
           </h3>
-          <h2>Step by Step Tutorial on How to Import Data</h2>
-          <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut 
-            labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris 
-            nisi ut aliquip ex ea commodo consequat. <br></br><br></br>
-            Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
-            Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-          </p>
+          <h2>Data Import Options</h2>
+          <ul>
+            <li>1. Live USB Connection</li>
+            <p>One data page, click <i>"Connect to STELLA"</i> and select the device from the browser’s serial dialog. Once connected, sensor readings will stream 
+              in real time, and the page will fill in the metadata, environmental values, and spectral bands automatically.
+            </p>
+            <li>2. Manual File Upload</li>
+            <p>If you have data saved from an SD card or another source, you can upload the file manually. The viewer will process 
+              the file and populate the same fields you would see during a live session. If your browser does not support the 
+              Web Serial API, try using Google Chrome, Microsoft Edge, or the manual upload option.
+            </p>
+          </ul>
         </div>
         <div className="importData-image">
+          <img src={importData} />
+          <p style={{padding: "8px 65px", fontFamily: "Times New Roman"}}>Browser dialog showing STELLA selected as a USB serial device.</p>
           <img src={placeholder} />
-          <img src={placeholder} />
+          <p style={{padding: "8px 65px", fontFamily: "Times New Roman"}}>File upload interface for importing STELLA data from a local file.</p>
         </div>
       </section>
 
@@ -85,7 +93,7 @@ function Home() {
             and explore where measurements were taken
           </p>
           <div>
-            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-gray-200 border border-gray-300 hover:bg-gray-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> View Map
+            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-green-100 border border-gray-300 hover:bg-green-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> View Map
               <svg className="w-4 h-4 ms-1.5 rtl:rotate-180 -me-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 12H5m14 0-4 4m4-4-4-4"/>
               </svg>
@@ -94,14 +102,14 @@ function Home() {
         </div>
         </a>
 
-        <a href="./Doc" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
+        <a href="./Docs" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
         <div className="flex flex-col justify-between md:p-4 leading-normal">
           <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900"> Build your STELLA device </h5>
           <p className="mb-6 text-gray-700">
             Learn how to assemble your own STELLA spectrometer with step-by-step build guides, parts lists, and setup instructions.
           </p>
           <div>
-            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-gray-200 border border-gray-300 hover:bg-gray-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> Read more
+            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-green-100 border border-gray-300 hover:bg-green-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> Read more
               <svg className="w-4 h-4 ms-1.5 rtl:rotate-180 -me-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 12H5m14 0-4 4m4-4-4-4"/>
               </svg>
@@ -118,7 +126,7 @@ function Home() {
             troubleshooting tips, and setup guidance.
           </p>
           <div>
-            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-gray-200 border border-gray-300 hover:bg-gray-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> Read more
+            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-green-100 border border-gray-300 hover:bg-green-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> Read more
               <svg className="w-4 h-4 ms-1.5 rtl:rotate-180 -me-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 12H5m14 0-4 4m4-4-4-4"/>
               </svg>
