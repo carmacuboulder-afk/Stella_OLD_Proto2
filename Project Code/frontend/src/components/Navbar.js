@@ -8,7 +8,7 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-left">
-        <img src={logo} alt="Stella logo" className="navbar-logo" />
+        <a href="./"><img src={logo} alt="Stella logo" className="navbar-logo" /></a>
       </div>
 
       <div className="navbar-links">

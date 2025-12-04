@@ -1,10 +1,10 @@
-import "../css/Doc.css";
+import "../css/Docs.css";
 import Demo from "../img/placeholder-vid.mov";
 import placeholder from "../img/placeholder.jpg"
 
 
 
-export default function Doc() {
+export default function Docs() {
   return (
     <main className="doc">
         <div className="doc-content">
