@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: space-between;
   background: white;
-  padding: 0.5rem 2rem;
+  padding: 20px 40px; 
   border-bottom: 1px solid #ddd;
 }
 
@@ -14,15 +14,22 @@
   align-items: center;
 }
 
-.navbar-logo {
-  height: 60px;
-  width: auto;
+.header {
+    display: flex;
+    align-items: center;       
+    justify-content: space-between;  /* logo left, links right */
+    padding: 20px 40px;         /* arbitrary until it looks pretty*/
+}
+.navbar img {
+    height: 60px;         
+    margin-bottom: 0;
+    margin-top: -6px;     /* pull upward to look pretty*/
+    object-fit: contain;
 }
 
 /* Link area */
 .navbar-links {
   display: flex;
-  align-items: center;
   gap: 2.5rem; /* spacing between links */
 }
 
