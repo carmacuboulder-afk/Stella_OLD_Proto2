@@ -238,7 +238,7 @@ export default function Data() {
 
   return (
     <div style={{ textAlign: "center", padding: "20px", maxWidth: "1000px", margin: "0 auto" }}>
-      <h2>Data Page</h2>
+
 
       {/* tab toggle */}
       <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "30px" }}>
@@ -282,12 +282,11 @@ export default function Data() {
             
             {/* upload box */}
             <div style={{ 
-              padding: "10px", 
+              padding: "20px", 
               border: "1px solid #ccc", 
-              borderRadius: "8px",
-
+              borderRadius: "8px", 
               width: "350px",
-              height: "200px", 
+              height: "350", 
               overflow: "hidden",
               boxSizing: "border-box",
               display: "flex",
@@ -301,8 +300,14 @@ export default function Data() {
                 accept=".csv" 
                 onChange={(e) => setSelectedFile(e.target.files[0])} 
                 style={{ 
-                  maxWidth: "100%",
-                  marginBottom: "15px" 
+                   marginBottom: "15px", 
+                   border: "1px solid #ccc",
+                   padding: "5px",
+                   borderRadius: "5px",
+                   backgroundColor: "#f9f9f9",
+                   width: "68%",
+                   boxSizing: "border-box",
+                   cursor: "pointer"
                 }}
               />
               
@@ -329,7 +334,7 @@ export default function Data() {
                 fontSize: "14px",
                 whiteSpace: "nowrap",
                 overflow: "hidden", 
-                textOverflow: "ellipsis" 
+                textOverflow: "ellipsis"
               }}>
                 {uploadStatus}
               </p>
