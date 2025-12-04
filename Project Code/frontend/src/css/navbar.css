@@ -1,0 +1,52 @@
+/* Container */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  padding: 20px 40px; 
+  border-bottom: 1px solid #ddd;
+}
+
+/* Logo area */
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.header {
+    display: flex;
+    align-items: center;       
+    justify-content: space-between;  /* logo left, links right */
+    padding: 20px 40px;         /* arbitrary until it looks pretty*/
+}
+.navbar img {
+    height: 60px;         
+    margin-bottom: 0;
+    margin-top: -6px;     /* pull upward to look pretty*/
+    object-fit: contain;
+}
+
+/* Link area */
+.navbar-links {
+  display: flex;
+  gap: 2.5rem; /* spacing between links */
+}
+
+/* Text links */
+.navbar-links a {
+  text-decoration: none;
+  font-size: 1.1rem;
+  color: black;
+  font-weight: 500;
+}
+
+/* Hover effect */
+.navbar-links a:hover {
+  color: #2e7d32; /* green highlight */
+}
+
+/* Make the Log In link slightly bolder */
+.login-link {
+  font-weight: 600;
+}
