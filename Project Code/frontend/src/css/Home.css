@@ -96,7 +96,7 @@
 }
 
 .home-about a {
-  color: #0000ee;             
+  color: #0808b9;             
   text-decoration: underline; 
 }
 
@@ -110,7 +110,7 @@
 }
 
 .importData-content h3 {
-    font-weight: normal;
+    font-weight: 300;
     font-size: 1.4rem;
     line-height: 3rem;
     max-width: 60vw;
@@ -120,7 +120,7 @@
 
 .importData-content h2 {
     font-size: 1.4rem;
-    line-height: 3rem;
+    line-height: 2rem;
     max-width: 50vw;
     padding: 25px;
 }
@@ -130,10 +130,11 @@
     line-height: 3rem;
     max-width: 50vw;
     padding: 25px;
+    font-weight: lighter;
 }
 
 .importData-content a {
-  color: #0000ee;             
+  color: #0808b9;             
   text-decoration: underline; 
 }
 
@@ -145,11 +146,19 @@
     margin: 40px;
 }
 
-/* cards */
 .home-cards {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     padding: 40px 50px;
     gap: 10px;
+}
+
+.home-cards h5 {
+    font-weight: 400;
+    margin-bottom: 20px;
+}
+
+.home-cards p {
+    font-weight: 200;
 }
