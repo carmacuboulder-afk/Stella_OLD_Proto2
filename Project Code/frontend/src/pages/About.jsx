@@ -14,9 +14,7 @@ export default function About() {
       <p>
         CARMA works to advance and validate NASA’s STELLA devices for environmental, agricultural, and research applications. 
         Our team tests STELLA sensors in controlled environments, collects high-quality data, and demonstrates how the technology 
-        can support both new and existing research. We also focus on making STELLA more accessible by creating clear build guides 
-        and resources that help younger students assemble and use the devices. Through this work, CARMA helps pioneer low-cost, 
-        ground-based remote sensing for climate adaptation and resilience.
+        can support both new and existing research. 
       </p>
 
       <h2>Colorado Space Grant Consortium (COSGC)</h2>

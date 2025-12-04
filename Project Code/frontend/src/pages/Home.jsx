@@ -78,15 +78,14 @@ function Home() {
 
       <section className="home-cards">
         <a href="./Map" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
-        <img className="object-cover w-full rounded-lg h-64 md:h-auto md:w-48 mb-4 md:mb-0" src={placeholder}/>
         <div className="flex flex-col justify-between md:p-4 leading-normal">
-          <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900"> Visualize your STELLA data directly on an interactive map. </h5>
+          <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900"> Visualize your STELLA data on a map. </h5>
           <p className="mb-6 text-gray-700">
             Each data point shows its GPS location, date, and time — with options to zoom, toggle, 
             and explore where measurements were taken
           </p>
           <div>
-            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-gray-200 border border-gray-300 hover:bg-gray-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> Read more
+            <button type="button" className="inline-flex items-center w-auto text-gray-800 bg-gray-200 border border-gray-300 hover:bg-gray-300 hover:text-gray-900 focus:ring-4 focus:ring-gray-200 shadow font-medium leading-5 rounded-full text-sm px-4 py-2.5 focus:outline-none"> View Map
               <svg className="w-4 h-4 ms-1.5 rtl:rotate-180 -me-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 12H5m14 0-4 4m4-4-4-4"/>
               </svg>
@@ -95,8 +94,7 @@ function Home() {
         </div>
         </a>
 
-        <a href="./Documentation.jsx" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
-        <img className="object-cover w-full rounded-lg h-64 md:h-auto md:w-48 mb-4 md:mb-0" src={placeholder}/>
+        <a href="./Doc" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
         <div className="flex flex-col justify-between md:p-4 leading-normal">
           <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900"> Build your STELLA device </h5>
           <p className="mb-6 text-gray-700">
@@ -112,8 +110,7 @@ function Home() {
         </div>
         </a>
 
-        <a href="./FAQ.jsx" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
-        <img className="object-cover w-full rounded-lg h-64 md:h-auto md:w-48 mb-4 md:mb-0" src={placeholder}/>
+        <a href="./faq" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
         <div className="flex flex-col justify-between md:p-4 leading-normal">
           <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900"> FAQ </h5>
           <p className="mb-6 text-gray-700">
@@ -129,45 +126,6 @@ function Home() {
           </div>
         </div>
         </a>
-
-      {/*<div className="bg-slate-50 block max-w-sm border border-gray-200 rounded-lg shadow-sm vertical">
-        <a href="#"><img className="rounded-t-lg" src={placeholder}/></a>
-        <div className="p-6 text-center">
-          <a href="#"> <h5 className="mt-3 mb-6 text-2xl font-semibold tracking-tight text-gray-900">Streamlining your design process today.</h5></a>
-          <a href="#" className="inline-flex items-center text-white bg-blue-600 box-border border border-transparent hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 shadow-sm font-medium leading-5 rounded-lg text-sm px-4 py-2.5 focus:outline-none">
-            Read more
-            <svg className="w-4 h-4 ms-1.5 rtl:rotate-180 -me-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width={24} height={24} fill="none" viewBox="0 0 24 24">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5m14 0-4 4m4-4-4-4"/>
-            </svg>
-          </a>
-        </div>
-      </div>
-      
-      <div className="bg-slate-50 block max-w-sm border border-gray-200 rounded-lg shadow-sm vertical">
-        <a href="#"><img className="rounded-t-lg" src={placeholder}/></a>
-        <div className="p-6 text-center">
-          <a href="#"> <h5 className="mt-3 mb-6 text-2xl font-semibold tracking-tight text-gray-900">Streamlining your design process today.</h5></a>
-          <a href="#" className="inline-flex items-center text-white bg-blue-600 box-border border border-transparent hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 shadow-sm font-medium leading-5 rounded-lg text-sm px-4 py-2.5 focus:outline-none">
-            Read more
-            <svg className="w-4 h-4 ms-1.5 rtl:rotate-180 -me-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width={24} height={24} fill="none" viewBox="0 0 24 24">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5m14 0-4 4m4-4-4-4"/>
-            </svg>
-          </a>
-        </div>
-      </div>
-
-      <div className="bg-slate-50 block max-w-sm border border-gray-200 rounded-lg shadow-sm vertical">
-        <a href="#"><img className="rounded-t-lg" src={placeholder}/></a>
-        <div className="p-6 text-center">
-          <a href="#"> <h5 className="mt-3 mb-6 text-2xl font-semibold tracking-tight text-gray-900">Streamlining your design process today.</h5></a>
-          <a href="#" className="inline-flex items-center text-white bg-blue-600 box-border border border-transparent hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 shadow-sm font-medium leading-5 rounded-lg text-sm px-4 py-2.5 focus:outline-none">
-            Read more
-            <svg className="w-4 h-4 ms-1.5 rtl:rotate-180 -me-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width={24} height={24} fill="none" viewBox="0 0 24 24">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5m14 0-4 4m4-4-4-4"/>
-            </svg>
-          </a>
-        </div>
-      </div>*/}
 
         
       </section>
