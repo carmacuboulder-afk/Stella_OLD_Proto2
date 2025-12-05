@@ -18,5 +18,11 @@
 .about h2 {
     font-weight: bolder;
     margin: 1rem;
+    text-align: left;
 }
 
+.about p {
+    text-align: left;
+    margin: 1rem;
+    margin-top: 1rem;
+}
