@@ -66,7 +66,8 @@ export default function Data() {
         ...row,
         timeLabel: new Date(row.timestamp_iso8601).toLocaleTimeString(),
         surface_temp: parseFloat(row.surface_temperature_c),
-        air_temp: parseFloat(row.air_temperature_c)
+        air_temp: parseFloat(row.air_temperature_c),
+        humidity: parseFloat(row.relative_humidity_percent),
       }));
 
       setGraphData(formatted);
@@ -251,7 +252,7 @@ export default function Data() {
             cursor: "pointer",
             border: "none",
             borderRadius: "5px",
-            backgroundColor: activeTab === "history" ? "#007bff" : "#e0e0e0",
+            backgroundColor: activeTab === "history" ? "#28a745" : "#e0e0e0",
             color: activeTab === "history" ? "white" : "#333"
           }}
         >
@@ -319,7 +320,7 @@ export default function Data() {
                   width: "100%",
                   padding: "8px 10px", 
                   cursor: "pointer",
-                  backgroundColor: !selectedFile ? "#ccc" : "#007bff",
+                  backgroundColor: !selectedFile ? "#ccc" : "#28a745",
                   color: "white",
                   border: "none",
                   borderRadius: "4px"
@@ -353,7 +354,7 @@ export default function Data() {
                         padding: "8px", 
                         cursor: "pointer", 
                         borderBottom: "1px solid #eee",
-                        backgroundColor: selectedUploadId === u.id ? "#e6f7ff" : "transparent", 
+                        backgroundColor: selectedUploadId === u.id ? "#edf5f9ff" : "transparent", 
                         wordWrap: "break-all"
                       }}
                     >
@@ -371,11 +372,24 @@ export default function Data() {
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                 <h3 style={{ margin: 0 }}>
-                  {graphMetric === "surface_temp" ? "Surface Temp" : "Air Temp"} (°C)
+                  {graphMetric === "all" ? "All Metrics" : (graphMetric === "surface_temp" ? "Surface Temp (°C)" : "Air Temp (°C)")}
                 </h3>
 
-                {/* surface/air toggle*/}
+                {/* surface/air/all toggle*/}
                 <div>
+                  <button 
+                    onClick={() => setGraphMetric("all")}
+                    style={{
+                      padding: "5px 15px",
+                      marginRight: "10px",
+                      cursor: "pointer",
+                      backgroundColor: graphMetric === "all" ? "#A0B79E" : "#eee",
+                      color: graphMetric === "all" ? "white" : "#333",
+                      border: "none", borderRadius: "4px"
+                    }}
+                  >
+                    All
+                  </button>
                   <button 
                     onClick={() => setGraphMetric("surface_temp")}
                     style={{
@@ -410,17 +424,25 @@ export default function Data() {
                     <LineChart data={graphData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="timeLabel" minTickGap={30} />
-                      <YAxis domain={['auto', 'auto']} label={{ value: 'Temp (°C)', angle: -90, position: 'insideLeft' }} />
+                      <YAxis domain={['auto', 'auto']} label={{ value: 'Value', angle: -90, position: 'insideLeft' }} />
                       <Tooltip />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey={graphMetric} 
-                        stroke={graphMetric === "surface_temp" ? "#8884d8" : "#82ca9d"} 
-                        dot={false} 
-                        strokeWidth={2} 
-                        name={graphMetric === "surface_temp" ? "Surface Temp" : "Air Temp"} 
-                      />
+                      {graphMetric === "all" ? (
+                        <>
+                          <Line type="monotone" dataKey="surface_temp" stroke="#8884d8" dot={false} strokeWidth={2} name="Surface Temp" />
+                          <Line type="monotone" dataKey="air_temp" stroke="#82ca9d" dot={false} strokeWidth={2} name="Air Temp" />
+                          <Line type="monotone" dataKey="humidity" stroke="#ffc658" dot={false} strokeWidth={2} name="Humidity" />
+                        </>
+                      ) : (
+                        <Line 
+                          type="monotone" 
+                          dataKey={graphMetric} 
+                          stroke={graphMetric === "surface_temp" ? "#8884d8" : "#82ca9d"} 
+                          dot={false} 
+                          strokeWidth={2} 
+                          name={graphMetric === "surface_temp" ? "Surface Temp" : "Air Temp"} 
+                        />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -439,7 +461,7 @@ export default function Data() {
             style={{
               padding: "15px 30px",
               fontSize: "18px",
-              backgroundColor: isConnected ? "#ccc" : "#007bff",
+              backgroundColor: isConnected ? "#ccc" : "#28a745",
               color: "white",
               border: "none",
               borderRadius: "5px",
