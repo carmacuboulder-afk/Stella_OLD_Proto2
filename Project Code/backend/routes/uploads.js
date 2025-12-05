@@ -38,7 +38,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
   const stream = Readable.from(req.file.buffer.toString());
   
   stream
-    .pipe(csv())
+    .pipe(csv({ mapHeaders: ({ header }) => header.trim() }))
     .on('data', (data) => results.push(data))
     .on('end', async () => {
       try {
