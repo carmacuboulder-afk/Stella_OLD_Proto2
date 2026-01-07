@@ -1,12 +1,16 @@
 import "../css/Register.css";
 import { useState } from "react";
+import { useNavigate } from 'react-router-dom';
 
 function Login() {
     // setting up states for user inputs
+    const nav = useNavigate();
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password_one, setPassword_One] = useState("");
     const [password_two, setPassword_Two] = useState("");
+    const [school, setSchool] = useState("");
+    const [org, setOrg] = useState("");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -15,7 +19,7 @@ function Login() {
             const response = await fetch("http://localhost:8000/api/users/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, email, password_one, password_two })
+                body: JSON.stringify({ username, email, password_one, password_two, school, org })
             });
 
             const data = await response.json();
@@ -25,6 +29,8 @@ function Login() {
             }
 
             console.log("Register successful:", data);
+            nav("/login"); // on successful register, take user to login page to try credentials.
+            // TODO eventually probably just log in, create cookie etc.
             
         } 
         catch (err) {
@@ -83,6 +89,28 @@ function Login() {
                             placeholder=" password"
                             value={password_two}
                             onChange={(e) => setPassword_Two(e.target.value)}
+                        />
+                    </div>
+                    <div className="form-field-container">
+                        <p>Enter your school.</p>
+                        <input  
+                            className="input-container"
+                            id="school"
+                            type="text"
+                            placeholder=" school"
+                            value={school}
+                            onChange={(e) => setSchool(e.target.value)}
+                        />
+                    </div>
+                    <div className="form-field-container">
+                        <p>Enter your organization.</p>
+                        <input  
+                            className="input-container"
+                            id="org"
+                            type="text"
+                            placeholder=" organization"
+                            value={org}
+                            onChange={(e) => setOrg(e.target.value)}
                         />
                     </div>
                     <div>
