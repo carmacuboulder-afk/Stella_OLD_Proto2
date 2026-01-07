@@ -35,8 +35,8 @@ import Data from "./pages/Data";
 import Map from "./pages/Map";
 import About from "./pages/About";
 import FAQ from "./pages/FAQ";
-import Login from "./pages/Login";
 import Docs from "./pages/Docs";
+import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Footer from "./components/Footer";
 
@@ -52,8 +52,8 @@ function App() {
         <Route path="/data" element={<Data />} />
         <Route path="/map" element={<Map />} />
         <Route path="/faq" element={<FAQ />} />
-        <Route path="/login" element={<Login />} />
         <Route path="/docs" element={<Docs />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>
       <Footer></Footer>

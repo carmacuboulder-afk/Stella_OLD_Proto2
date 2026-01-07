@@ -1,3 +1,8 @@
 .login {
     
 }
+
+.register-button {
+    color: blue;
+    text-decoration: underline;
+}

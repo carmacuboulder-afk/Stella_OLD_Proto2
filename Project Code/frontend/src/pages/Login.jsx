@@ -9,6 +9,7 @@ function Login() {
                     
                 </form>
             </div>
+            <p>Don't have an account? <a href="/register" className="register-button">Register</a> here!</p>
         </main>
     );
 }
