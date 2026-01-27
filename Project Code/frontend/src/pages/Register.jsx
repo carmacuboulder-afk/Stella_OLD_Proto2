@@ -3,14 +3,24 @@ import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 
 function Login() {
-    // setting up states for user inputs
+    // to redirect after register
     const nav = useNavigate();
+
+    // toast for succes/fail
+    const [toast, setToast] = useState(null);
+
+    // user input states
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password_one, setPassword_One] = useState("");
     const [password_two, setPassword_Two] = useState("");
     const [school, setSchool] = useState("");
     const [org, setOrg] = useState("");
+
+    const showToast = (msg, type) => {
+        setToast({msg, type});
+        setTimeout(() => setToast(null), 3000);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -29,17 +39,23 @@ function Login() {
             }
 
             console.log("Register successful:", data);
-            nav("/login"); // on successful register, take user to login page to try credentials.
-            // TODO eventually probably just log in, create cookie etc.
+            showToast("Registration Successful!", "success");
+            setTimeout(() => nav("/login"), 3000);            
             
         } 
         catch (err) {
             console.log(err);
+            showToast("Registration Failed!", "failure");
         } 
     };
 
     return (
         <main className="register">
+            {toast && (
+                <div className={`toast toast-${toast.type}`}>
+                    {toast.msg}
+                </div>
+            )}
             <h1><b>Register</b></h1>
             <div className="register-form-container">
                 <form onSubmit={handleSubmit}>
