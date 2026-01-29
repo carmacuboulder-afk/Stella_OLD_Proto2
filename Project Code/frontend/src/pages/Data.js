@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Data() {
@@ -40,6 +40,34 @@ export default function Data() {
     "860": "--",
   });
 
+  const [dataBuffer, setDataBuffer] = useState([]);
+  const [isSending, setIsSending] = useState(false);
+  const [liveSession, setLiveSession] = useState(null); // { sessionId, deviceId }
+  const [isRecording, setIsRecording] = useState(false); // Controls whether data is being stored
+  const [deviceInfo, setDeviceInfo] = useState(null); // Store device_type and software_version
+  const [dataPointCount, setDataPointCount] = useState(0); // Track uploaded points
+  const [recordingBuffer, setRecordingBuffer] = useState([]); // Buffer data locally during recording
+  
+  // Use refs to track recording state and buffer for immediate access in callbacks
+  const isRecordingRef = useRef(false);
+  const recordingBufferRef = useRef([]);
+
+  // Retry sending buffered data
+  useEffect(() => {
+    if (dataBuffer.length > 0 && !isSending) {
+      setIsSending(true);
+      const sendBuffered = async () => {
+        const buffer = [...dataBuffer];
+        setDataBuffer([]);
+        for (const data of buffer) {
+          await sendDataToBackend(data);
+        }
+        setIsSending(false);
+      };
+      sendBuffered();
+    }
+  }, [dataBuffer, isSending]);
+
   // history tab
   useEffect(() => {
     fetchUploads();
@@ -62,13 +90,34 @@ export default function Data() {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/${uploadId}/data`);
       const data = await res.json();
       
-      const formatted = data.map(row => ({
-        ...row,
-        timeLabel: new Date(row.timestamp_iso8601).toLocaleTimeString(),
-        surface_temp: parseFloat(row.surface_temperature_c),
-        air_temp: parseFloat(row.air_temperature_c),
-        humidity: parseFloat(row.relative_humidity_percent),
-      }));
+      // Sort by timestamp to ensure correct order
+      const sorted = data.sort((a, b) => new Date(a.timestamp_iso8601) - new Date(b.timestamp_iso8601));
+      
+      const formatted = sorted.map((row, index) => {
+        const date = new Date(row.timestamp_iso8601);
+        return {
+          id: index,  // Unique identifier for each data point
+          timestamp: row.timestamp_iso8601,
+          timeLabel: date.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            year: '2-digit',
+            hour: 'numeric', 
+            minute: '2-digit'
+          }),
+          // Temperature (try both uppercase and lowercase column names from postgres)
+          surface_temp: parseFloat(row.surface_temperature_c || row.surface_temperature_C) || 0,
+          air_temp: parseFloat(row.air_temperature_c || row.air_temperature_C) || 0,
+          humidity: parseFloat(row.relative_humidity_percent) || 0,
+          // Irradiance values
+          v450: parseFloat(row.irradiance_450nm_blue_irradiance_uw_per_cm_squared) || 0,
+          b500: parseFloat(row.irradiance_500nm_cyan_irradiance_uw_per_cm_squared) || 0,
+          g550: parseFloat(row.irradiance_550nm_green_irradiance_uw_per_cm_squared) || 0,
+          y570: parseFloat(row.irradiance_570nm_yellow_irradiance_uw_per_cm_squared) || 0,
+          o600: parseFloat(row.irradiance_600nm_orange_irradiance_uw_per_cm_squared) || 0,
+          r650: parseFloat(row.irradiance_650nm_red_irradiance_uw_per_cm_squared) || 0,
+        };
+      });
 
       setGraphData(formatted);
     } catch (err) {
@@ -109,6 +158,41 @@ export default function Data() {
     }
   };
   // live tab
+  const startLiveSession = async (deviceType, softwareVersion) => {
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_type: deviceType, software_version: softwareVersion }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setLiveSession({ sessionId: data.sessionId, deviceId: data.deviceId });
+      console.log('Live session started:', data.sessionId);
+      return data;
+    } catch (error) {
+      console.error('Failed to start live session:', error);
+      return null;
+    }
+  };
+
+  const endLiveSession = async () => {
+    if (!liveSession) return;
+    try {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: liveSession.sessionId }),
+      });
+      console.log('Live session ended');
+      fetchUploads(); // Refresh uploads list
+    } catch (error) {
+      console.error('Failed to end live session:', error);
+    } finally {
+      setLiveSession(null);
+    }
+  };
+
   const connectToSerial = async () => {
     if (!("serial" in navigator)) {
       setStatus("Web Serial API not supported in this browser.");
@@ -119,7 +203,9 @@ export default function Data() {
       const port = await navigator.serial.requestPort();
       await port.open({ baudRate: 115200 });
       setIsConnected(true);
-      setStatus("Connected to STELLA");
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      setStatus("Connected to STELLA - Recording data...");
 
       const textDecoder = new TextDecoderStream();
       const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
@@ -150,6 +236,16 @@ export default function Data() {
     } finally { 
       reader.releaseLock();
       setIsConnected(false);
+      const wasRecording = isRecordingRef.current;
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      
+      if (wasRecording) {
+        setStatus('Disconnected - Uploading recorded data...');
+        await stopRecording();
+      } else {
+        setStatus('Disconnected');
+      }
     }
     } catch (error) { 
       console.error("Connection error:", error);
@@ -158,7 +254,123 @@ export default function Data() {
     }
   };
 
-  const processLine = (line) => {
+  const uploadBatch = async (dataPoints) => {
+    if (dataPoints.length === 0) return { uploaded: 0, total: 0 };
+    
+    try {
+      if (!deviceInfo) {
+        console.error('No device info for batch upload');
+        return { uploaded: 0, total: dataPoints.length };
+      }
+      
+      // Start session
+      const session = await startLiveSession(deviceInfo.device_type, deviceInfo.software_version);
+      if (!session) {
+        console.error('Failed to create session for batch');
+        return { uploaded: 0, total: dataPoints.length };
+      }
+      
+      // Upload all data points
+      let uploaded = 0;
+      for (const data of dataPoints) {
+        try {
+          const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: session.sessionId,
+              deviceId: session.deviceId,
+              ...data
+            }),
+          });
+          if (res.ok) uploaded++;
+        } catch (error) {
+          console.error('Failed to upload data point:', error);
+        }
+      }
+      
+      // End session
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.sessionId }),
+      });
+      
+      console.log(`Batch uploaded: ${uploaded}/${dataPoints.length} points`);
+      return { uploaded, total: dataPoints.length };
+    } catch (error) {
+      console.error('Batch upload error:', error);
+      return { uploaded: 0, total: dataPoints.length };
+    }
+  };
+
+  const stopRecording = async () => {
+    setIsRecording(false);
+    isRecordingRef.current = false;
+    
+    const bufferToUpload = [...recordingBufferRef.current];
+    const bufferSize = bufferToUpload.length;
+    
+    if (bufferSize === 0) {
+      setStatus('Recording stopped - No data to upload.');
+      setRecordingBuffer([]);
+      recordingBufferRef.current = [];
+      return;
+    }
+    
+    setStatus(`Uploading ${bufferSize} data points...`);
+    
+    // Upload remaining buffered data
+    const result = await uploadBatch(bufferToUpload);
+    
+    setStatus(`Recording stopped - ${result.uploaded}/${bufferSize} points uploaded successfully.`);
+    fetchUploads(); // Refresh uploads list
+    setRecordingBuffer([]);
+    recordingBufferRef.current = [];
+    setDataPointCount(0);
+  };
+
+  const startRecording = async () => {
+    setIsRecording(true);
+    isRecordingRef.current = true;
+    setRecordingBuffer([]);
+    recordingBufferRef.current = [];
+    setDataPointCount(0);
+    setStatus('Recording... (data buffered locally)');
+  };
+
+  const sendDataToBackend = async (data, session) => {
+    const currentSession = session || liveSession;
+    if (!currentSession) {
+      console.warn('No active session, buffering data');
+      setDataBuffer(prev => [...prev, data]);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: currentSession.sessionId,
+          deviceId: currentSession.deviceId,
+          ...data
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
+      // Successfully uploaded
+      setDataPointCount(prev => prev + 1);
+      console.log('Data point uploaded, total:', dataPointCount + 1);
+    } catch (error) {
+      console.error('Failed to send data:', error);
+      // Buffer the data for retry
+      setDataBuffer(prev => [...prev, data]);
+      setStatus(prev => prev.includes('(data buffered)') ? prev : prev + ' (data buffered)');
+    }
+  };
+
+  const processLine = async (line) => {
     if (!line.includes("mirror_data")) return;
 
     try {
@@ -183,10 +395,50 @@ export default function Data() {
         }
       }
 
+      // Store device info when we see it
+      if (newData.device_type && newData.software_version) {
+        setDeviceInfo({
+          device_type: newData.device_type,
+          software_version: newData.software_version
+        });
+      }
+
+      // Always update the display
       setSensorData((prev) => ({
         ...prev,
         ...newData,
       }));
+
+      // Only buffer data if recording is enabled (use ref for immediate check)
+      if (!isRecordingRef.current) {
+        return;
+      }
+
+      // Buffer data locally during recording (use ref for immediate updates)
+      recordingBufferRef.current.push(newData);
+      const bufferLength = recordingBufferRef.current.length;
+      setRecordingBuffer([...recordingBufferRef.current]); // Update state for display
+      setDataPointCount(bufferLength);
+      console.log('Data point buffered, total:', bufferLength);
+      
+      // Auto-upload every 100 points
+      if (bufferLength >= 100) {
+        console.log('Auto-uploading batch of 100 points...');
+        setStatus(`Auto-uploading batch of ${bufferLength} points...`);
+        
+        const batchToUpload = [...recordingBufferRef.current];
+        const result = await uploadBatch(batchToUpload);
+        
+        if (result.uploaded > 0) {
+          setStatus(`Recording... (${result.uploaded} points uploaded, continuing)`);
+          recordingBufferRef.current = []; // Clear ref buffer
+          setRecordingBuffer([]); // Clear state buffer
+          setDataPointCount(0);
+          fetchUploads(); // Refresh uploads list
+        } else {
+          setStatus('Recording... (upload failed, will retry on stop)');
+        }
+      }
     } catch (err) { 
       console.error("Error parsing line:", line, err);
     }
@@ -372,7 +624,10 @@ export default function Data() {
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                 <h3 style={{ margin: 0 }}>
-                  {graphMetric === "all" ? "All Metrics" : (graphMetric === "surface_temp" ? "Surface Temp (°C)" : "Air Temp (°C)")}
+                  {graphMetric === "all" ? "All Metrics" : 
+                   graphMetric === "surface_temp" ? "Surface Temp (°C)" : 
+                   graphMetric === "air_temp" ? "Air Temp (°C)" :
+                   "Irradiance Spectrum (μW/cm²)"}
                 </h3>
 
                 {/* surface/air/all toggle*/}
@@ -415,6 +670,19 @@ export default function Data() {
                   >
                     Air Temp
                   </button>
+                  <button 
+                    onClick={() => setGraphMetric("irradiance")}
+                    style={{
+                      padding: "5px 15px",
+                      marginLeft: "10px",
+                      cursor: "pointer",
+                      backgroundColor: graphMetric === "irradiance" ? "#ffc658" : "#eee",
+                      color: graphMetric === "irradiance" ? "white" : "#333",
+                      border: "none", borderRadius: "4px"
+                    }}
+                  >
+                    Irradiance
+                  </button>
                 </div>
               </div>
               
@@ -423,15 +691,42 @@ export default function Data() {
                   <ResponsiveContainer>
                     <LineChart data={graphData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="timeLabel" minTickGap={30} />
+                      <XAxis 
+                        dataKey="id" 
+                        minTickGap={30}
+                        tickFormatter={(value) => {
+                          const point = graphData[value];
+                          return point ? point.timeLabel : '';
+                        }}
+                      />
                       <YAxis domain={['auto', 'auto']} label={{ value: 'Value', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (typeof value === 'number') {
+                            return [value.toFixed(2), name];
+                          }
+                          return [value, name];
+                        }}
+                        labelFormatter={(label) => {
+                          const point = graphData[label];
+                          return point ? `Time: ${point.timeLabel}` : label;
+                        }}
+                      />
                       <Legend />
                       {graphMetric === "all" ? (
                         <>
                           <Line type="monotone" dataKey="surface_temp" stroke="#8884d8" dot={false} strokeWidth={2} name="Surface Temp" />
                           <Line type="monotone" dataKey="air_temp" stroke="#82ca9d" dot={false} strokeWidth={2} name="Air Temp" />
                           <Line type="monotone" dataKey="humidity" stroke="#ffc658" dot={false} strokeWidth={2} name="Humidity" />
+                        </>
+                      ) : graphMetric === "irradiance" ? (
+                        <>
+                          <Line type="monotone" dataKey="v450" stroke="#4169E1" dot={false} strokeWidth={2} name="450nm (Blue)" />
+                          <Line type="monotone" dataKey="b500" stroke="#00CED1" dot={false} strokeWidth={2} name="500nm (Cyan)" />
+                          <Line type="monotone" dataKey="g550" stroke="#32CD32" dot={false} strokeWidth={2} name="550nm (Green)" />
+                          <Line type="monotone" dataKey="y570" stroke="#FFD700" dot={false} strokeWidth={2} name="570nm (Yellow)" />
+                          <Line type="monotone" dataKey="o600" stroke="#FF8C00" dot={false} strokeWidth={2} name="600nm (Orange)" />
+                          <Line type="monotone" dataKey="r650" stroke="#DC143C" dot={false} strokeWidth={2} name="650nm (Red)" />
                         </>
                       ) : (
                         <Line 
@@ -455,22 +750,70 @@ export default function Data() {
       {/* live */}
       {activeTab === "live" && (
         <div className="fade-in">
-          <button
-            onClick={connectToSerial}
-            disabled={isConnected}
-            style={{
-              padding: "15px 30px",
-              fontSize: "18px",
-              backgroundColor: isConnected ? "#ccc" : "#28a745",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: isConnected ? "default" : "pointer",
-              marginBottom: "30px",
-            }}
-          >
-            {isConnected ? "Connected" : "Connect to USB Device"}
-          </button>
+          <div style={{ display: "flex", justifyContent: "center", gap: "15px", marginBottom: "30px" }}>
+            <button
+              onClick={connectToSerial}
+              disabled={isConnected}
+              style={{
+                padding: "15px 30px",
+                fontSize: "18px",
+                backgroundColor: isConnected ? "#ccc" : "#28a745",
+                color: "white",
+                border: "none",
+                borderRadius: "5px",
+                cursor: isConnected ? "default" : "pointer",
+              }}
+            >
+              {isConnected ? "Connected" : "Connect to USB Device"}
+            </button>
+
+            {isConnected && isRecording && (
+              <button
+                onClick={stopRecording}
+                style={{
+                  padding: "15px 30px",
+                  fontSize: "18px",
+                  backgroundColor: "#dc3545",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                }}
+              >
+                ⏹ Stop Recording
+              </button>
+            )}
+
+            {isConnected && !isRecording && (
+              <button
+                onClick={startRecording}
+                style={{
+                  padding: "15px 30px",
+                  fontSize: "18px",
+                  backgroundColor: "#28a745",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                }}
+              >
+                ⏺ Start Recording
+              </button>
+            )}
+          </div>
+
+          {isConnected && (
+            <p style={{ 
+              marginBottom: "10px", 
+              fontSize: "14px", 
+              color: isRecording ? "#28a745" : "#666",
+              fontWeight: isRecording ? "bold" : "normal"
+            }}>
+              {isRecording 
+                ? `⏺ Recording to Session #${liveSession?.sessionId || '(starting...)'}` 
+                : "⏸ Monitoring only (not recording)"}
+            </p>
+          )}
 
           {status && (
             <p style={{ marginBottom: "20px", fontWeight: "bold", color: status.includes("Error") ? "red" : "green" }}>
