@@ -440,4 +440,20 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// GET /api/uploads/user/:userId
+router.get('/user/:userId', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM uploads WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.params.userId]
+    );
+
+    res.json(result.rows || []);
+  } catch (err) {
+    console.error("Error fetching uploads by user:", err);
+    next(err);
+  }
+});
+
+
 export default router;

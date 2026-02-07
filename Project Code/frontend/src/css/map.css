@@ -1,0 +1,18 @@
+.Map {
+    font-family: sans-serif;
+    text-align: center;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Sizing of map container */
+.leaflet-container {
+    height: 80vh;
+    margin-top: 3%;
+    margin-left: 4%;
+    margin-right: 4%;
+}
