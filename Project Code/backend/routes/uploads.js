@@ -14,8 +14,22 @@ const upload = multer({
 });
 
 const formatTimestamp = (raw) => {
-  if (!raw || raw.includes('-')) return raw;
-  return `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}T${raw.slice(9,11)}:${raw.slice(11,13)}:${raw.slice(13)}`;
+  if (!raw) return new Date().toISOString();
+  raw = raw.trim();
+  
+  // Already in ISO format with dashes
+  if (raw.includes('-') && raw.includes('T')) return raw;
+  
+  // Format: YYYYMMDDTHHMMSSZ (e.g., 20950514T131041Z)
+  const match = raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/);
+  if (match) {
+    const [, year, month, day, hour, min, sec] = match;
+    return `${year}-${month}-${day}T${hour}:${min}:${sec}Z`;
+  }
+  
+  // Fallback to current time if format not recognized
+  console.warn('Unrecognized timestamp format:', raw);
+  return new Date().toISOString();
 };
 
 // GET /api/uploads
@@ -197,6 +211,161 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
         client.release();
       }
     });
+});
+
+// Helper to safely parse floats
+const parseVal = (val) => {
+  if (val === undefined || val === null || val === '--' || val === '') return null;
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? null : parsed;
+};
+
+// POST /api/uploads/live/start - Start a new live session
+router.post('/live/start', async (req, res, next) => {
+  const { device_type, software_version } = req.body;
+
+  if (!device_type || !software_version) {
+    return res.status(400).json({ error: 'Missing device_type or software_version' });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Find or create device
+    let deviceId;
+    const deviceRes = await client.query(
+      "SELECT id FROM devices WHERE device_type = $1 AND software_version = $2 LIMIT 1",
+      [device_type, software_version]
+    );
+
+    if (deviceRes.rows.length > 0) {
+      deviceId = deviceRes.rows[0].id;
+    } else {
+      const newDevice = await client.query(
+        "INSERT INTO devices (device_type, software_version, name) VALUES ($1, $2, $3) RETURNING id",
+        [device_type, software_version, `Live ${device_type}`]
+      );
+      deviceId = newDevice.rows[0].id;
+    }
+
+    // Create upload session
+    const DEFAULT_USER_ID = 1;
+    const timestamp = new Date().toISOString();
+    const uploadName = `Live Session - ${new Date().toLocaleString()}`;
+
+    const uploadRes = await client.query(
+      `INSERT INTO uploads (
+        user_id, device_id, upload_name, timestamp_iso8601
+      ) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [DEFAULT_USER_ID, deviceId, uploadName, timestamp]
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json({ 
+      sessionId: uploadRes.rows[0].id, 
+      deviceId,
+      message: 'Live session started' 
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Live session start error:", err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/uploads/live/data - Add data to existing session
+router.post('/live/data', async (req, res, next) => {
+  const { sessionId, deviceId, ...liveData } = req.body;
+
+  if (!sessionId || !deviceId) {
+    return res.status(400).json({ error: 'Missing sessionId or deviceId' });
+  }
+
+  try {
+    const timestamp = new Date().toISOString();
+
+    const dataRow = {
+      upload_id: sessionId,
+      device_id: deviceId,
+      timestamp_iso8601: timestamp,
+      
+      // Environmental sensors
+      surface_temperature_C: parseVal(liveData.surface_temp),
+      air_temperature_C: parseVal(liveData.air_temp),
+      relative_humidity_percent: parseVal(liveData.rel_humidity),
+      barometric_pressure_hPa: parseVal(liveData.barometric_pressure),
+      altitude_uncalibrated_m: parseVal(liveData.altitude),
+      range_m: parseVal(liveData.range),
+      
+      // Visible light spectrum
+      irradiance_450nm_blue_irradiance_uW_per_cm_squared: parseVal(liveData.v450),
+      irradiance_500nm_cyan_irradiance_uW_per_cm_squared: parseVal(liveData.b500),
+      irradiance_550nm_green_irradiance_uW_per_cm_squared: parseVal(liveData.g550),
+      irradiance_570nm_yellow_irradiance_uW_per_cm_squared: parseVal(liveData.y570),
+      irradiance_600nm_orange_irradiance_uW_per_cm_squared: parseVal(liveData.o600),
+      irradiance_650nm_red_irradiance_uW_per_cm_squared: parseVal(liveData.r650),
+      
+      // Near-infrared spectrum
+      irradiance_610nm_orange_irradiance_uW_per_cm_squared: parseVal(liveData['610']),
+      irradiance_680nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['680']),
+      irradiance_730nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['730']),
+      irradiance_760nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['760']),
+      irradiance_810nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['810']),
+      irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['860']),
+    };
+
+    // Insert data
+    const columns = Object.keys(dataRow);
+    const values = Object.values(dataRow);
+    const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+
+    await pool.query(
+      `INSERT INTO data (${columns.join(', ')}) VALUES (${placeholders})`,
+      values
+    );
+
+    res.status(201).json({ message: 'Data point saved' });
+
+  } catch (err) {
+    console.error("Live data error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/uploads/live/end - End a live session (optional, for cleanup)
+router.post('/live/end', async (req, res, next) => {
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Missing sessionId' });
+  }
+
+  try {
+    // Update the upload name to include end time and data count
+    const countRes = await pool.query(
+      'SELECT COUNT(*) as count FROM data WHERE upload_id = $1',
+      [sessionId]
+    );
+    
+    const dataPoints = countRes.rows[0].count;
+    const endTime = new Date().toLocaleString();
+    
+    await pool.query(
+      'UPDATE uploads SET upload_name = upload_name || $1 WHERE id = $2',
+      [` (${dataPoints} points, ended ${endTime})`, sessionId]
+    );
+
+    res.status(200).json({ message: 'Session ended', dataPoints });
+
+  } catch (err) {
+    console.error("Live session end error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/uploads/:id/data
