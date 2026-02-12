@@ -19,7 +19,7 @@ function Login() {
 
     const showToast = (msg, type) => {
         setToast({msg, type});
-        setTimeout(() => setToast(null), 3000);
+        setTimeout(() => setToast(null), 2000);
     };
 
     const handleSubmit = async (e) => {
@@ -40,7 +40,7 @@ function Login() {
 
             console.log("Register successful:", data);
             showToast("Registration Successful!", "success");
-            setTimeout(() => nav("/login"), 3000);            
+            setTimeout(() => nav("/login"), 2000);            
             
         } 
         catch (err) {
