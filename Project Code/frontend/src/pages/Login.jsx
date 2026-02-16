@@ -36,7 +36,7 @@ function Login() {
             <div className="login-form-container">
                 <form onSubmit={handleSubmit}>
                     <div className="form-field-container">
-                        <p>Enter your username or email associated with your account.</p>
+                        <p>Enter your username or email address associated with your account</p>
                         <input
                             className="input-container"
                             id="username"
@@ -48,7 +48,7 @@ function Login() {
                         />
                     </div>
                     <div className="form-field-container">
-                        <p>Enter your password.</p>
+                        <p>Enter your password</p>
                         <input  
                             className="input-container"
                             id="password"
@@ -61,7 +61,7 @@ function Login() {
                     </div>
                     <div>
                         <button
-                            className="button"
+                            className="submitButton"
                             id="login-button"
                             type="submit"
                         >
