@@ -2,6 +2,7 @@ import "../css/Home.css";
 import backgroundImg from "../img/background.jpg";
 import StellaDevice from "../img/stellaSpin.gif";
 import importData from "../img/import_data.png";
+import MaunalUpload from "../img/ManualUploadFile.png";
 import placeholder from "../img/placeholder.jpg";
 
 
@@ -79,7 +80,7 @@ function Home() {
         <div className="importData-image">
           <img src={importData} />
           <p style={{padding: "8px 65px", fontFamily: "Times New Roman"}}>Browser dialog showing STELLA selected as a USB serial device.</p>
-          <img src={placeholder} />
+          <img src={MaunalUpload} />
           <p style={{padding: "8px 65px", fontFamily: "Times New Roman"}}>File upload interface for importing STELLA data from a local file.</p>
         </div>
       </section>
