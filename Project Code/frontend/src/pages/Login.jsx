@@ -1,10 +1,12 @@
 import "../css/Login.css";
 import { useState } from "react";
+import { useNavigate } from 'react-router-dom';
 
-function Login() {
+function Login({setLoggedIn}) {
     // setting up states for user inputs
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const nav = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -12,6 +14,7 @@ function Login() {
         try {
             const response = await fetch("http://localhost:8000/api/users/login", {
                 method: "POST",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password })
             });
@@ -22,8 +25,9 @@ function Login() {
                 throw new Error(data.error || "Login failed");
             }
 
-            console.log("Login successful:", data);
-            
+            // console.log("Login successful:", data);
+            setLoggedIn(true);
+            nav("/");
         } 
         catch (err) {
             console.log(err);

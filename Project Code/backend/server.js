@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import pool from './db.js';
+import cookieParser from 'cookie-parser';
 
 // Import Routes
 import usersRouter from './routes/users.js';
@@ -17,8 +18,15 @@ const PORT = process.env.PORT || 3001;
 // Allow JSON request
 app.use(express.json());
 
-// Allow our app to call this API
-app.use(cors());
+// Allow our app to call this API, allows setting of cookies
+app.use(cors({
+  origin: "http://localhost:3000",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+}));
+app.options("*", cors());
+
+app.use(cookieParser());
 
 // Log incoming HTTP requests to console
 app.use(morgan('dev'));

@@ -54,7 +54,7 @@ function Login() {
 
             console.log("Register successful:", data);
             showToast("Registration Successful!", "success");
-            setTimeout(() => nav("/login"), 2000);            
+            setTimeout(() => nav("/login"), 1000);            
             
         } 
         catch (err) {
