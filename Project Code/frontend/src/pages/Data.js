@@ -58,6 +58,11 @@ export default function Data() {
   const pointDotStyle = { r: 1.5, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
   const activePointDotStyle = { r: 2.5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
   const safeDivide = (numerator, denominator) => (denominator ? numerator / denominator : 0);
+  const formatTimeLabel = (date) => {
+    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${datePart}, ${timePart}`;
+  };
 
   const availableBatchNumbers = Array.from(
     new Set(graphData.map((row) => row.batchNumber).filter(Boolean))
@@ -69,15 +74,6 @@ export default function Data() {
   }));
 
   const graphConfigurations = [
-    {
-      key: "temp",
-      title: "Air and Surface Temperature",
-      yAxisLabel: "Temperature (°C)",
-      lines: [
-        { dataKey: "surface_temp", stroke: "#DC143C", name: "Surface Temp" },
-        { dataKey: "air_temp", stroke: "#1E90FF", name: "Air Temp" },
-      ],
-    },
     {
       key: "raw_visible",
       title: "Raw Visible Spectrum",
@@ -102,6 +98,15 @@ export default function Data() {
         { dataKey: "n760", stroke: "#4B0082", name: "760nm" },
         { dataKey: "n810", stroke: "#191970", name: "810nm" },
         { dataKey: "n860", stroke: "#000000", name: "860nm" },
+      ],
+    },
+    {
+      key: "temp",
+      title: "Air and Surface Temperature",
+      yAxisLabel: "Temperature (°C)",
+      lines: [
+        { dataKey: "surface_temp", stroke: "#DC143C", name: "Surface Temp" },
+        { dataKey: "air_temp", stroke: "#1E90FF", name: "Air Temp" },
       ],
     },
     {
@@ -251,13 +256,7 @@ export default function Data() {
           timestamp: row.timestamp_iso8601,
           batchNumber,
           note: row.note || "",
-          timeLabel: date.toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric',
-            year: '2-digit',
-            hour: 'numeric', 
-            minute: '2-digit'
-          }),
+          timeLabel: formatTimeLabel(date),
           // Temperature (try both uppercase and lowercase column names from postgres)
           surface_temp: parseFloat(row.surface_temperature_c || row.surface_temperature_C) || 0,
           air_temp: parseFloat(row.air_temperature_c || row.air_temperature_C) || 0,
@@ -891,25 +890,27 @@ export default function Data() {
                               <LineChart data={filteredGraphData} margin={{ top: 10, right: 20, left: 30, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis 
-                                  dataKey="chartIndex" 
+                                  dataKey="timeLabel" 
                                   height={55}
                                   tickMargin={12}
+                                  interval="preserveStartEnd"
+                                  tick={{ fontWeight: 700, fill: '#000' }}
+                                  axisLine={{ stroke: '#000' }}
+                                  tickLine={{ stroke: '#000' }}
                                   minTickGap={30}
-                                  tickFormatter={(value) => {
-                                    const pointIndex = Math.round(Number(value));
-                                    const point = filteredGraphData[pointIndex];
-                                    return point ? point.timeLabel : '';
-                                  }}
                                 />
                                 <YAxis
                                   domain={['auto', 'auto']}
                                   width={90}
+                                  tick={{ fontWeight: 700, fill: '#000' }}
+                                  axisLine={{ stroke: '#000' }}
+                                  tickLine={{ stroke: '#000' }}
                                   label={{
                                     value: config.yAxisLabel,
                                     angle: -90,
                                     position: 'left',
                                     offset: 18,
-                                    style: { textAnchor: 'middle' }
+                                    style: { textAnchor: 'middle', fontWeight: 700, fill: '#000' }
                                   }}
                                 />
                                 <Tooltip 
@@ -920,9 +921,10 @@ export default function Data() {
                                     return [value, name];
                                   }}
                                   labelFormatter={(label) => {
+                                    if (typeof label === 'string') return `Time: ${label}`;
                                     const pointIndex = Math.round(Number(label));
                                     const point = filteredGraphData[pointIndex];
-                                    return point ? `Time: ${point.timeLabel}` : label;
+                                    return point ? `Time: ${point.timeLabel}` : `Time: ${label}`;
                                   }}
                                 />
                                 {config.lines.map((line) => (
