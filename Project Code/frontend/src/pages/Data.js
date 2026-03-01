@@ -10,6 +10,9 @@ export default function Data() {
   const [loadingGraph, setLoadingGraph] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [noteDrafts, setNoteDrafts] = useState({});
+  const [noteSaveStatus, setNoteSaveStatus] = useState({});
+  const [savingNoteId, setSavingNoteId] = useState(null);
 
   const [selectedBatchNumber, setSelectedBatchNumber] = useState("");
 
@@ -52,8 +55,9 @@ export default function Data() {
   const isRecordingRef = useRef(false);
   const recordingBufferRef = useRef([]);
 
-  const pointDotStyle = { r: 3, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
-  const activePointDotStyle = { r: 5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
+  const pointDotStyle = { r: 1.5, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
+  const activePointDotStyle = { r: 2.5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
+  const safeDivide = (numerator, denominator) => (denominator ? numerator / denominator : 0);
 
   const availableBatchNumbers = Array.from(
     new Set(graphData.map((row) => row.batchNumber).filter(Boolean))
@@ -66,32 +70,89 @@ export default function Data() {
 
   const graphConfigurations = [
     {
-      key: "surface_temp",
-      title: "Surface Temp (°C)",
-      yAxisLabel: "Value",
+      key: "temp",
+      title: "Air and Surface Temperature",
+      yAxisLabel: "Temperature (°C)",
       lines: [
-        { dataKey: "surface_temp", stroke: "#8884d8", name: "Surface Temp" },
+        { dataKey: "surface_temp", stroke: "#DC143C", name: "Surface Temp" },
+        { dataKey: "air_temp", stroke: "#1E90FF", name: "Air Temp" },
       ],
     },
     {
-      key: "air_temp",
-      title: "Air Temp (°C)",
-      yAxisLabel: "Value",
+      key: "raw_visible",
+      title: "Raw Visible Spectrum",
+      yAxisLabel: "Irradiance (uW/cm²)",
       lines: [
-        { dataKey: "air_temp", stroke: "#82ca9d", name: "Air Temp" },
+        { dataKey: "v450", stroke: "#6A5ACD", name: "450nm" },
+        { dataKey: "b500", stroke: "#00CED1", name: "500nm" },
+        { dataKey: "g550", stroke: "#32CD32", name: "550nm" },
+        { dataKey: "y570", stroke: "#FFD700", name: "570nm" },
+        { dataKey: "o600", stroke: "#FF8C00", name: "600nm" },
+        { dataKey: "n610", stroke: "#CD853F", name: "610nm" },
+        { dataKey: "r650", stroke: "#DC143C", name: "650nm" },
       ],
     },
     {
-      key: "raw",
-      title: "RAW",
-      yAxisLabel: "Frequency (Hz)",
+      key: "raw_invisible",
+      title: "Raw Invisible (Near-Infrared) Spectrum",
+      yAxisLabel: "Irradiance (uW/cm²)",
       lines: [
-        { dataKey: "v450", stroke: "#4169E1", name: "450nm (Blue)" },
-        { dataKey: "b500", stroke: "#00CED1", name: "500nm (Cyan)" },
-        { dataKey: "g550", stroke: "#32CD32", name: "550nm (Green)" },
-        { dataKey: "y570", stroke: "#FFD700", name: "570nm (Yellow)" },
-        { dataKey: "o600", stroke: "#FF8C00", name: "600nm (Orange)" },
-        { dataKey: "r650", stroke: "#DC143C", name: "650nm (Red)" },
+        { dataKey: "n680", stroke: "#8B0000", name: "680nm" },
+        { dataKey: "n730", stroke: "#8A2BE2", name: "730nm" },
+        { dataKey: "n760", stroke: "#4B0082", name: "760nm" },
+        { dataKey: "n810", stroke: "#191970", name: "810nm" },
+        { dataKey: "n860", stroke: "#000000", name: "860nm" },
+      ],
+    },
+    {
+      key: "reflectance",
+      title: "Reflectance",
+      yAxisLabel: "Relative Reflectance",
+      lines: [
+        { dataKey: "refl450", stroke: "#6A5ACD", name: "450nm" },
+        { dataKey: "refl500", stroke: "#00CED1", name: "500nm" },
+        { dataKey: "refl550", stroke: "#32CD32", name: "550nm" },
+        { dataKey: "refl570", stroke: "#FFD700", name: "570nm" },
+        { dataKey: "refl600", stroke: "#FF8C00", name: "600nm" },
+        { dataKey: "refl610", stroke: "#CD853F", name: "610nm" },
+        { dataKey: "refl650", stroke: "#DC143C", name: "650nm" },
+        { dataKey: "refl680", stroke: "#8B0000", name: "680nm" },
+        { dataKey: "refl730", stroke: "#8A2BE2", name: "730nm" },
+        { dataKey: "refl760", stroke: "#4B0082", name: "760nm" },
+        { dataKey: "refl810", stroke: "#191970", name: "810nm" },
+        { dataKey: "refl860", stroke: "#000000", name: "860nm" },
+      ],
+    },
+    {
+      key: "ndvi",
+      title: "NDVI",
+      yAxisLabel: "Index (unitless)",
+      lines: [
+        { dataKey: "ndvi", stroke: "#2E8B57", name: "NDVI" },
+      ],
+    },
+    {
+      key: "sr",
+      title: "SR",
+      yAxisLabel: "Ratio",
+      lines: [
+        { dataKey: "sr", stroke: "#1E90FF", name: "SR" },
+      ],
+    },
+    {
+      key: "dswi4",
+      title: "DSWI 4",
+      yAxisLabel: "Index (unitless)",
+      lines: [
+        { dataKey: "dswi4", stroke: "#A0522D", name: "DSWI 4" },
+      ],
+    },
+    {
+      key: "nirv",
+      title: "NIRv",
+      yAxisLabel: "Index (unitless)",
+      lines: [
+        { dataKey: "nirv", stroke: "#800080", name: "NIRv" },
       ],
     },
   ];
@@ -153,10 +214,43 @@ export default function Data() {
         const date = new Date(row.timestamp_iso8601);
         const rawBatchNumber = row.batch_number ?? row.batch ?? row.batchNumber ?? "";
         const batchNumber = `${rawBatchNumber}`.trim() || "Unspecified";
+        const v450 = parseFloat(row.irradiance_450nm_blue_irradiance_uw_per_cm_squared) || 0;
+        const b500 = parseFloat(row.irradiance_500nm_cyan_irradiance_uw_per_cm_squared) || 0;
+        const g550 = parseFloat(row.irradiance_550nm_green_irradiance_uw_per_cm_squared) || 0;
+        const y570 = parseFloat(row.irradiance_570nm_yellow_irradiance_uw_per_cm_squared) || 0;
+        const o600 = parseFloat(row.irradiance_600nm_orange_irradiance_uw_per_cm_squared) || 0;
+        const n610 = parseFloat(row.irradiance_610nm_orange_irradiance_uw_per_cm_squared) || 0;
+        const r650 = parseFloat(row.irradiance_650nm_red_irradiance_uw_per_cm_squared) || 0;
+        const n680 = parseFloat(row.irradiance_680nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
+        const n730 = parseFloat(row.irradiance_730nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
+        const n760 = parseFloat(row.irradiance_760nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
+        const n810 = parseFloat(row.irradiance_810nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
+        const n860 = parseFloat(row.irradiance_860nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
+        const totalIrradiance = v450 + b500 + g550 + y570 + o600 + n610 + r650 + n680 + n730 + n760 + n810 + n860;
+        const refl450 = safeDivide(v450, totalIrradiance);
+        const refl500 = safeDivide(b500, totalIrradiance);
+        const refl550 = safeDivide(g550, totalIrradiance);
+        const refl570 = safeDivide(y570, totalIrradiance);
+        const refl600 = safeDivide(o600, totalIrradiance);
+        const refl610 = safeDivide(n610, totalIrradiance);
+        const refl650 = safeDivide(r650, totalIrradiance);
+        const refl680 = safeDivide(n680, totalIrradiance);
+        const refl730 = safeDivide(n730, totalIrradiance);
+        const refl760 = safeDivide(n760, totalIrradiance);
+        const refl810 = safeDivide(n810, totalIrradiance);
+        const refl860 = safeDivide(n860, totalIrradiance);
+        const ndvi = safeDivide(n860 - r650, n860 + r650);
+        const sr = safeDivide(n860, r650);
+        // DSWI 4 approximation based on available STELLA bands.
+        const dswi4 = safeDivide(n860 + g550, n680 + r650);
+        const nirv = ndvi * refl860;
+
         return {
           id: index,  // Unique identifier for each data point
+          dataPointId: row.id,
           timestamp: row.timestamp_iso8601,
           batchNumber,
+          note: row.note || "",
           timeLabel: date.toLocaleString('en-US', { 
             month: 'short', 
             day: 'numeric',
@@ -168,21 +262,85 @@ export default function Data() {
           surface_temp: parseFloat(row.surface_temperature_c || row.surface_temperature_C) || 0,
           air_temp: parseFloat(row.air_temperature_c || row.air_temperature_C) || 0,
           humidity: parseFloat(row.relative_humidity_percent) || 0,
-          // Irradiance values
-          v450: parseFloat(row.irradiance_450nm_blue_irradiance_uw_per_cm_squared) || 0,
-          b500: parseFloat(row.irradiance_500nm_cyan_irradiance_uw_per_cm_squared) || 0,
-          g550: parseFloat(row.irradiance_550nm_green_irradiance_uw_per_cm_squared) || 0,
-          y570: parseFloat(row.irradiance_570nm_yellow_irradiance_uw_per_cm_squared) || 0,
-          o600: parseFloat(row.irradiance_600nm_orange_irradiance_uw_per_cm_squared) || 0,
-          r650: parseFloat(row.irradiance_650nm_red_irradiance_uw_per_cm_squared) || 0,
+          // Raw irradiance
+          v450,
+          b500,
+          g550,
+          y570,
+          o600,
+          n610,
+          r650,
+          n680,
+          n730,
+          n760,
+          n810,
+          n860,
+          // Reflectance and vegetation indices
+          refl450,
+          refl500,
+          refl550,
+          refl570,
+          refl600,
+          refl610,
+          refl650,
+          refl680,
+          refl730,
+          refl760,
+          refl810,
+          refl860,
+          ndvi,
+          sr,
+          dswi4,
+          nirv,
         };
       });
 
       setGraphData(formatted);
+      setNoteDrafts(
+        Object.fromEntries(formatted.map((row) => [row.dataPointId, row.note || ""]))
+      );
     } catch (err) {
       console.error("Failed to fetch graph data", err);
     } finally {
       setLoadingGraph(false);
+    }
+  };
+
+  const handleNoteDraftChange = (dataPointId, value) => {
+    setNoteDrafts((prev) => ({
+      ...prev,
+      [dataPointId]: value,
+    }));
+  };
+
+  const handleSaveNote = async (dataPointId) => {
+    if (!dataPointId) return;
+    const note = noteDrafts[dataPointId] ?? "";
+    setSavingNoteId(dataPointId);
+    setNoteSaveStatus((prev) => ({ ...prev, [dataPointId]: "" }));
+
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/data/${dataPointId}/note`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      });
+
+      const responseBody = await res.json();
+      if (!res.ok) {
+        throw new Error(responseBody.error || 'Failed to save note');
+      }
+
+      setGraphData((prev) =>
+        prev.map((row) =>
+          row.dataPointId === dataPointId ? { ...row, note: responseBody.note ?? "" } : row
+        )
+      );
+      setNoteSaveStatus((prev) => ({ ...prev, [dataPointId]: "Saved" }));
+    } catch (error) {
+      setNoteSaveStatus((prev) => ({ ...prev, [dataPointId]: "Save failed" }));
+    } finally {
+      setSavingNoteId(null);
     }
   };
 
@@ -549,7 +707,7 @@ export default function Data() {
   ];
 
   return (
-    <div style={{ textAlign: "center", padding: "20px", maxWidth: "1000px", margin: "0 auto" }}>
+    <div style={{ textAlign: "center", padding: "20px", maxWidth: "1400px", margin: "0 auto" }}>
 
 
       {/* tab toggle */}
@@ -715,69 +873,138 @@ export default function Data() {
               
               {loadingGraph ? <p>Loading data...</p> : (
                 filteredGraphData.length === 0 ? <p>No data points found for this batch.</p> : (
-                  <div style={{ display: "grid", gap: "28px" }}>
-                    {graphConfigurations.map((config) => (
-                      <div key={config.key} style={{ border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
-                        <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>{config.title}</h4>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center", marginBottom: "10px" }}>
-                          {config.lines.map((line) => (
-                            <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
-                              <span style={{ width: "16px", height: "2px", backgroundColor: line.stroke, display: "inline-block" }} />
-                              <span>{line.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ width: '100%', height: 500 }}>
-                          <ResponsiveContainer>
-                            <LineChart data={filteredGraphData} margin={{ top: 10, right: 20, left: 30, bottom: 20 }}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis 
-                                dataKey="chartIndex" 
-                                height={55}
-                                tickMargin={12}
-                                minTickGap={30}
-                                tickFormatter={(value) => {
-                                  const pointIndex = Math.round(Number(value));
-                                  const point = filteredGraphData[pointIndex];
-                                  return point ? point.timeLabel : '';
-                                }}
-                              />
-                              <YAxis
-                                domain={['auto', 'auto']}
-                                width={80}
-                                label={{ value: config.yAxisLabel, angle: -90, position: 'left', dx: -18 }}
-                              />
-                              <Tooltip 
-                                formatter={(value, name) => {
-                                  if (typeof value === 'number') {
-                                    return [value.toFixed(2), name];
-                                  }
-                                  return [value, name];
-                                }}
-                                labelFormatter={(label) => {
-                                  const pointIndex = Math.round(Number(label));
-                                  const point = filteredGraphData[pointIndex];
-                                  return point ? `Time: ${point.timeLabel}` : label;
-                                }}
-                              />
-                              {config.lines.map((line) => (
-                                <Line
-                                  key={line.dataKey}
-                                  type="monotone"
-                                  dataKey={line.dataKey}
-                                  stroke={line.stroke}
-                                  dot={pointDotStyle}
-                                  activeDot={activePointDotStyle}
-                                  strokeWidth={2}
-                                  name={line.name}
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))", gap: "20px" }}>
+                      {graphConfigurations.map((config) => (
+                        <div key={config.key} style={{ border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
+                          <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>{config.title}</h4>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center", marginBottom: "10px" }}>
+                            {config.lines.map((line) => (
+                              <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                                <span style={{ width: "16px", height: "2px", backgroundColor: line.stroke, display: "inline-block" }} />
+                                <span>{line.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ width: '100%', height: 470 }}>
+                            <ResponsiveContainer>
+                              <LineChart data={filteredGraphData} margin={{ top: 10, right: 20, left: 30, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis 
+                                  dataKey="chartIndex" 
+                                  height={55}
+                                  tickMargin={12}
+                                  minTickGap={30}
+                                  tickFormatter={(value) => {
+                                    const pointIndex = Math.round(Number(value));
+                                    const point = filteredGraphData[pointIndex];
+                                    return point ? point.timeLabel : '';
+                                  }}
                                 />
-                              ))}
-                            </LineChart>
-                          </ResponsiveContainer>
+                                <YAxis
+                                  domain={['auto', 'auto']}
+                                  width={90}
+                                  label={{
+                                    value: config.yAxisLabel,
+                                    angle: -90,
+                                    position: 'left',
+                                    offset: 18,
+                                    style: { textAnchor: 'middle' }
+                                  }}
+                                />
+                                <Tooltip 
+                                  formatter={(value, name) => {
+                                    if (typeof value === 'number') {
+                                      return [value.toFixed(4), name];
+                                    }
+                                    return [value, name];
+                                  }}
+                                  labelFormatter={(label) => {
+                                    const pointIndex = Math.round(Number(label));
+                                    const point = filteredGraphData[pointIndex];
+                                    return point ? `Time: ${point.timeLabel}` : label;
+                                  }}
+                                />
+                                {config.lines.map((line) => (
+                                  <Line
+                                    key={line.dataKey}
+                                    type="monotone"
+                                    dataKey={line.dataKey}
+                                    stroke={line.stroke}
+                                    dot={pointDotStyle}
+                                    activeDot={activePointDotStyle}
+                                    strokeWidth={2}
+                                    name={line.name}
+                                  />
+                                ))}
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
                         </div>
+                      ))}
+                    </div>
+
+                    <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
+                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Data Point Notes</h4>
+                      <p style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#555" }}>
+                        Add or update notes for any point in the selected batch.
+                      </p>
+                      <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+                        {filteredGraphData.map((point) => (
+                          <div
+                            key={`note-${point.dataPointId}`}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "170px 1fr auto auto",
+                              gap: "8px",
+                              alignItems: "center",
+                              padding: "8px 0",
+                              borderBottom: "1px solid #eee"
+                            }}
+                          >
+                            <div style={{ fontSize: "12px", color: "#333" }}>{point.timeLabel}</div>
+                            <input
+                              type="text"
+                              value={noteDrafts[point.dataPointId] ?? ""}
+                              onChange={(e) => handleNoteDraftChange(point.dataPointId, e.target.value)}
+                              placeholder="Add note for this data point"
+                              style={{
+                                width: "100%",
+                                padding: "7px 9px",
+                                borderRadius: "4px",
+                                border: "1px solid #bbb"
+                              }}
+                            />
+                            <button
+                              onClick={() => handleSaveNote(point.dataPointId)}
+                              disabled={savingNoteId === point.dataPointId}
+                              style={{
+                                padding: "7px 12px",
+                                borderRadius: "4px",
+                                border: "none",
+                                cursor: "pointer",
+                                backgroundColor: savingNoteId === point.dataPointId ? "#ccc" : "#1f6feb",
+                                color: "white"
+                              }}
+                            >
+                              {savingNoteId === point.dataPointId ? "Saving..." : "Save"}
+                            </button>
+                            <span
+                              style={{
+                                minWidth: "70px",
+                                fontSize: "12px",
+                                color: noteSaveStatus[point.dataPointId]
+                                  ? (noteSaveStatus[point.dataPointId] === "Saved" ? "green" : "red")
+                                  : "#555"
+                              }}
+                            >
+                              {noteSaveStatus[point.dataPointId] || ""}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  </>
                 )
               )}
             </div>

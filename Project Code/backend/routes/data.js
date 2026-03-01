@@ -42,4 +42,27 @@ router.get('/upload/:uploadId', async (req, res, next) => {
   }
 });
 
+// PUT /api/data/:id/note
+router.put('/:id/note', async (req, res, next) => {
+  const { note } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE data
+       SET note = $1
+       WHERE id = $2
+       RETURNING id, note`,
+      [note ?? '', req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Data point not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
