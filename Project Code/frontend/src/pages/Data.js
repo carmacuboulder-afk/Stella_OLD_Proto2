@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Data() {
   const [activeTab, setActiveTab] = useState("history");
@@ -11,8 +11,7 @@ export default function Data() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState("");
 
-  const [graphMetric, setGraphMetric] = useState("surface_temp");
-  const [selectedBatchNumber, setSelectedBatchNumber] = useState("all");
+  const [selectedBatchNumber, setSelectedBatchNumber] = useState("");
 
   const [isConnected, setIsConnected] = useState(false);
   const [status, setStatus] = useState("");
@@ -60,16 +59,42 @@ export default function Data() {
     new Set(graphData.map((row) => row.batchNumber).filter(Boolean))
   );
 
-  const filteredGraphData = (
-    selectedBatchNumber === "all"
-      ? graphData
-      : graphData.filter((row) => row.batchNumber === selectedBatchNumber)
-  ).map((row, index) => ({
+  const filteredGraphData = graphData.filter((row) => row.batchNumber === selectedBatchNumber).map((row, index) => ({
     ...row,
     chartIndex: index,
   }));
 
-  const yAxisLabel = graphMetric === "irradiance" ? "Frequency (Hz)" : "Value";
+  const graphConfigurations = [
+    {
+      key: "surface_temp",
+      title: "Surface Temp (°C)",
+      yAxisLabel: "Value",
+      lines: [
+        { dataKey: "surface_temp", stroke: "#8884d8", name: "Surface Temp" },
+      ],
+    },
+    {
+      key: "air_temp",
+      title: "Air Temp (°C)",
+      yAxisLabel: "Value",
+      lines: [
+        { dataKey: "air_temp", stroke: "#82ca9d", name: "Air Temp" },
+      ],
+    },
+    {
+      key: "raw",
+      title: "RAW",
+      yAxisLabel: "Frequency (Hz)",
+      lines: [
+        { dataKey: "v450", stroke: "#4169E1", name: "450nm (Blue)" },
+        { dataKey: "b500", stroke: "#00CED1", name: "500nm (Cyan)" },
+        { dataKey: "g550", stroke: "#32CD32", name: "550nm (Green)" },
+        { dataKey: "y570", stroke: "#FFD700", name: "570nm (Yellow)" },
+        { dataKey: "o600", stroke: "#FF8C00", name: "600nm (Orange)" },
+        { dataKey: "r650", stroke: "#DC143C", name: "650nm (Red)" },
+      ],
+    },
+  ];
 
   // Retry sending buffered data
   useEffect(() => {
@@ -92,6 +117,17 @@ export default function Data() {
     fetchUploads();
   }, []);
 
+  useEffect(() => {
+    if (availableBatchNumbers.length === 0) {
+      if (selectedBatchNumber !== "") setSelectedBatchNumber("");
+      return;
+    }
+
+    if (!availableBatchNumbers.includes(selectedBatchNumber)) {
+      setSelectedBatchNumber(availableBatchNumbers[0]);
+    }
+  }, [availableBatchNumbers, selectedBatchNumber]);
+
   const fetchUploads = async () => {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads`);
@@ -104,7 +140,7 @@ export default function Data() {
 
   const handleSelectUpload = async (uploadId) => {
     setSelectedUploadId(uploadId);
-    setSelectedBatchNumber("all");
+    setSelectedBatchNumber("");
     setLoadingGraph(true);
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/${uploadId}/data`);
@@ -646,14 +682,8 @@ export default function Data() {
             <div style={{ marginBottom: "50px", padding: "20px", border: "2px solid #000", borderRadius: "10px" }}>
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h3 style={{ margin: 0, fontWeight: 700 }}>
-                  {graphMetric === "all" ? "All Metrics" : 
-                   graphMetric === "surface_temp" ? "Surface Temp (°C)" : 
-                   graphMetric === "air_temp" ? "Air Temp (°C)" :
-                   "RAW"}
-                </h3>
+                <h3 style={{ margin: 0, fontWeight: 700 }}>Data Graphs</h3>
 
-                {/* surface/air/all toggle*/}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
                     Batch
@@ -670,129 +700,83 @@ export default function Data() {
                       cursor: "pointer"
                     }}
                   >
-                    <option value="all">All Batches</option>
-                    {availableBatchNumbers.map((batch) => (
-                      <option key={batch} value={batch}>
-                        {batch === "Unspecified" ? "Unspecified" : `Batch ${batch}`}
-                      </option>
-                    ))}
+                    {availableBatchNumbers.length === 0 ? (
+                      <option value="" disabled>No batches available</option>
+                    ) : (
+                      availableBatchNumbers.map((batch) => (
+                        <option key={batch} value={batch}>
+                          {batch === "Unspecified" ? "Unspecified" : `Batch ${batch}`}
+                        </option>
+                      ))
+                    )}
                   </select>
-                  <button 
-                    onClick={() => setGraphMetric("all")}
-                    style={{
-                      padding: "5px 15px",
-                      marginRight: "10px",
-                      cursor: "pointer",
-                      backgroundColor: graphMetric === "all" ? "#A0B79E" : "#eee",
-                      color: graphMetric === "all" ? "white" : "#333",
-                      border: "none", borderRadius: "4px"
-                    }}
-                  >
-                    All
-                  </button>
-                  <button 
-                    onClick={() => setGraphMetric("surface_temp")}
-                    style={{
-                      padding: "5px 15px",
-                      marginRight: "10px",
-                      cursor: "pointer",
-                      backgroundColor: graphMetric === "surface_temp" ? "#8884d8" : "#eee",
-                      color: graphMetric === "surface_temp" ? "white" : "#333",
-                      border: "none", borderRadius: "4px"
-                    }}
-                  >
-                    Surface Temp
-                  </button>
-                  <button 
-                    onClick={() => setGraphMetric("air_temp")}
-                    style={{
-                      padding: "5px 15px",
-                      cursor: "pointer",
-                      backgroundColor: graphMetric === "air_temp" ? "#82ca9d" : "#eee",
-                      color: graphMetric === "air_temp" ? "white" : "#333",
-                      border: "none", borderRadius: "4px"
-                    }}
-                  >
-                    Air Temp
-                  </button>
-                  <button 
-                    onClick={() => setGraphMetric("irradiance")}
-                    style={{
-                      padding: "5px 15px",
-                      marginLeft: "10px",
-                      cursor: "pointer",
-                      backgroundColor: graphMetric === "irradiance" ? "#ffc658" : "#eee",
-                      color: graphMetric === "irradiance" ? "white" : "#333",
-                      border: "none", borderRadius: "4px"
-                    }}
-                  >
-                    RAW
-                  </button>
                 </div>
               </div>
               
               {loadingGraph ? <p>Loading data...</p> : (
                 filteredGraphData.length === 0 ? <p>No data points found for this batch.</p> : (
-                  <div style={{ width: '100%', height: 500 }}>
-                    <ResponsiveContainer>
-                      <LineChart data={filteredGraphData} margin={{ top: 10, right: 20, left: 30, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="chartIndex" 
-                          minTickGap={30}
-                          tickFormatter={(value) => {
-                            const pointIndex = Math.round(Number(value));
-                            const point = filteredGraphData[pointIndex];
-                            return point ? point.timeLabel : '';
-                          }}
-                        />
-                        <YAxis
-                          domain={['auto', 'auto']}
-                          width={80}
-                          label={{ value: yAxisLabel, angle: -90, position: 'left', dx: -18 }}
-                        />
-                        <Tooltip 
-                          formatter={(value, name) => {
-                            if (typeof value === 'number') {
-                              return [value.toFixed(2), name];
-                            }
-                            return [value, name];
-                          }}
-                          labelFormatter={(label) => {
-                            const pointIndex = Math.round(Number(label));
-                            const point = filteredGraphData[pointIndex];
-                            return point ? `Time: ${point.timeLabel}` : label;
-                          }}
-                        />
-                        <Legend />
-                        {graphMetric === "all" ? (
-                          <>
-                            <Line type="monotone" dataKey="surface_temp" stroke="#8884d8" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="Surface Temp" />
-                            <Line type="monotone" dataKey="air_temp" stroke="#82ca9d" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="Air Temp" />
-                            <Line type="monotone" dataKey="humidity" stroke="#ffc658" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="Humidity" />
-                          </>
-                        ) : graphMetric === "irradiance" ? (
-                          <>
-                            <Line type="monotone" dataKey="v450" stroke="#4169E1" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="450nm (Blue)" />
-                            <Line type="monotone" dataKey="b500" stroke="#00CED1" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="500nm (Cyan)" />
-                            <Line type="monotone" dataKey="g550" stroke="#32CD32" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="550nm (Green)" />
-                            <Line type="monotone" dataKey="y570" stroke="#FFD700" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="570nm (Yellow)" />
-                            <Line type="monotone" dataKey="o600" stroke="#FF8C00" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="600nm (Orange)" />
-                            <Line type="monotone" dataKey="r650" stroke="#DC143C" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="650nm (Red)" />
-                          </>
-                        ) : (
-                          <Line 
-                            type="monotone" 
-                            dataKey={graphMetric} 
-                            stroke={graphMetric === "surface_temp" ? "#8884d8" : "#82ca9d"} 
-                            dot={pointDotStyle}
-                            activeDot={activePointDotStyle}
-                            strokeWidth={2} 
-                            name={graphMetric === "surface_temp" ? "Surface Temp" : "Air Temp"} 
-                          />
-                        )}
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div style={{ display: "grid", gap: "28px" }}>
+                    {graphConfigurations.map((config) => (
+                      <div key={config.key} style={{ border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
+                        <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>{config.title}</h4>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center", marginBottom: "10px" }}>
+                          {config.lines.map((line) => (
+                            <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                              <span style={{ width: "16px", height: "2px", backgroundColor: line.stroke, display: "inline-block" }} />
+                              <span>{line.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ width: '100%', height: 500 }}>
+                          <ResponsiveContainer>
+                            <LineChart data={filteredGraphData} margin={{ top: 10, right: 20, left: 30, bottom: 20 }}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="chartIndex" 
+                                height={55}
+                                tickMargin={12}
+                                minTickGap={30}
+                                tickFormatter={(value) => {
+                                  const pointIndex = Math.round(Number(value));
+                                  const point = filteredGraphData[pointIndex];
+                                  return point ? point.timeLabel : '';
+                                }}
+                              />
+                              <YAxis
+                                domain={['auto', 'auto']}
+                                width={80}
+                                label={{ value: config.yAxisLabel, angle: -90, position: 'left', dx: -18 }}
+                              />
+                              <Tooltip 
+                                formatter={(value, name) => {
+                                  if (typeof value === 'number') {
+                                    return [value.toFixed(2), name];
+                                  }
+                                  return [value, name];
+                                }}
+                                labelFormatter={(label) => {
+                                  const pointIndex = Math.round(Number(label));
+                                  const point = filteredGraphData[pointIndex];
+                                  return point ? `Time: ${point.timeLabel}` : label;
+                                }}
+                              />
+                              {config.lines.map((line) => (
+                                <Line
+                                  key={line.dataKey}
+                                  type="monotone"
+                                  dataKey={line.dataKey}
+                                  stroke={line.stroke}
+                                  dot={pointDotStyle}
+                                  activeDot={activePointDotStyle}
+                                  strokeWidth={2}
+                                  name={line.name}
+                                />
+                              ))}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )
               )}
