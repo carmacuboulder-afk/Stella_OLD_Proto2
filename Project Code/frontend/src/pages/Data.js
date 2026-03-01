@@ -12,6 +12,7 @@ export default function Data() {
   const [uploadStatus, setUploadStatus] = useState("");
 
   const [graphMetric, setGraphMetric] = useState("surface_temp");
+  const [selectedBatchNumber, setSelectedBatchNumber] = useState("all");
 
   const [isConnected, setIsConnected] = useState(false);
   const [status, setStatus] = useState("");
@@ -52,6 +53,24 @@ export default function Data() {
   const isRecordingRef = useRef(false);
   const recordingBufferRef = useRef([]);
 
+  const pointDotStyle = { r: 3, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
+  const activePointDotStyle = { r: 5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
+
+  const availableBatchNumbers = Array.from(
+    new Set(graphData.map((row) => row.batchNumber).filter(Boolean))
+  );
+
+  const filteredGraphData = (
+    selectedBatchNumber === "all"
+      ? graphData
+      : graphData.filter((row) => row.batchNumber === selectedBatchNumber)
+  ).map((row, index) => ({
+    ...row,
+    chartIndex: index,
+  }));
+
+  const yAxisLabel = graphMetric === "irradiance" ? "Frequency (Hz)" : "Value";
+
   // Retry sending buffered data
   useEffect(() => {
     if (dataBuffer.length > 0 && !isSending) {
@@ -85,6 +104,7 @@ export default function Data() {
 
   const handleSelectUpload = async (uploadId) => {
     setSelectedUploadId(uploadId);
+    setSelectedBatchNumber("all");
     setLoadingGraph(true);
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/${uploadId}/data`);
@@ -95,9 +115,12 @@ export default function Data() {
       
       const formatted = sorted.map((row, index) => {
         const date = new Date(row.timestamp_iso8601);
+        const rawBatchNumber = row.batch_number ?? row.batch ?? row.batchNumber ?? "";
+        const batchNumber = `${rawBatchNumber}`.trim() || "Unspecified";
         return {
           id: index,  // Unique identifier for each data point
           timestamp: row.timestamp_iso8601,
+          batchNumber,
           timeLabel: date.toLocaleString('en-US', { 
             month: 'short', 
             day: 'numeric',
@@ -620,18 +643,40 @@ export default function Data() {
 
           {/* graph */}
           {selectedUploadId && (
-            <div style={{ marginBottom: "50px", padding: "20px", border: "1px solid #007bff", borderRadius: "10px" }}>
+            <div style={{ marginBottom: "50px", padding: "20px", border: "2px solid #000", borderRadius: "10px" }}>
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h3 style={{ margin: 0 }}>
+                <h3 style={{ margin: 0, fontWeight: 700 }}>
                   {graphMetric === "all" ? "All Metrics" : 
                    graphMetric === "surface_temp" ? "Surface Temp (°C)" : 
                    graphMetric === "air_temp" ? "Air Temp (°C)" :
-                   "Irradiance Spectrum (μW/cm²)"}
+                   "RAW"}
                 </h3>
 
                 {/* surface/air/all toggle*/}
-                <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                    Batch
+                  </label>
+                  <select
+                    id="batch-filter"
+                    value={selectedBatchNumber}
+                    onChange={(e) => setSelectedBatchNumber(e.target.value)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "4px",
+                      border: "1px solid #ccc",
+                      backgroundColor: "white",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value="all">All Batches</option>
+                    {availableBatchNumbers.map((batch) => (
+                      <option key={batch} value={batch}>
+                        {batch === "Unspecified" ? "Unspecified" : `Batch ${batch}`}
+                      </option>
+                    ))}
+                  </select>
                   <button 
                     onClick={() => setGraphMetric("all")}
                     style={{
@@ -681,66 +726,75 @@ export default function Data() {
                       border: "none", borderRadius: "4px"
                     }}
                   >
-                    Irradiance
+                    RAW
                   </button>
                 </div>
               </div>
               
               {loadingGraph ? <p>Loading data...</p> : (
-                <div style={{ width: '100%', height: 400 }}>
-                  <ResponsiveContainer>
-                    <LineChart data={graphData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="id" 
-                        minTickGap={30}
-                        tickFormatter={(value) => {
-                          const point = graphData[value];
-                          return point ? point.timeLabel : '';
-                        }}
-                      />
-                      <YAxis domain={['auto', 'auto']} label={{ value: 'Value', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip 
-                        formatter={(value, name) => {
-                          if (typeof value === 'number') {
-                            return [value.toFixed(2), name];
-                          }
-                          return [value, name];
-                        }}
-                        labelFormatter={(label) => {
-                          const point = graphData[label];
-                          return point ? `Time: ${point.timeLabel}` : label;
-                        }}
-                      />
-                      <Legend />
-                      {graphMetric === "all" ? (
-                        <>
-                          <Line type="monotone" dataKey="surface_temp" stroke="#8884d8" dot={false} strokeWidth={2} name="Surface Temp" />
-                          <Line type="monotone" dataKey="air_temp" stroke="#82ca9d" dot={false} strokeWidth={2} name="Air Temp" />
-                          <Line type="monotone" dataKey="humidity" stroke="#ffc658" dot={false} strokeWidth={2} name="Humidity" />
-                        </>
-                      ) : graphMetric === "irradiance" ? (
-                        <>
-                          <Line type="monotone" dataKey="v450" stroke="#4169E1" dot={false} strokeWidth={2} name="450nm (Blue)" />
-                          <Line type="monotone" dataKey="b500" stroke="#00CED1" dot={false} strokeWidth={2} name="500nm (Cyan)" />
-                          <Line type="monotone" dataKey="g550" stroke="#32CD32" dot={false} strokeWidth={2} name="550nm (Green)" />
-                          <Line type="monotone" dataKey="y570" stroke="#FFD700" dot={false} strokeWidth={2} name="570nm (Yellow)" />
-                          <Line type="monotone" dataKey="o600" stroke="#FF8C00" dot={false} strokeWidth={2} name="600nm (Orange)" />
-                          <Line type="monotone" dataKey="r650" stroke="#DC143C" dot={false} strokeWidth={2} name="650nm (Red)" />
-                        </>
-                      ) : (
-                        <Line 
-                          type="monotone" 
-                          dataKey={graphMetric} 
-                          stroke={graphMetric === "surface_temp" ? "#8884d8" : "#82ca9d"} 
-                          dot={false} 
-                          strokeWidth={2} 
-                          name={graphMetric === "surface_temp" ? "Surface Temp" : "Air Temp"} 
+                filteredGraphData.length === 0 ? <p>No data points found for this batch.</p> : (
+                  <div style={{ width: '100%', height: 500 }}>
+                    <ResponsiveContainer>
+                      <LineChart data={filteredGraphData} margin={{ top: 10, right: 20, left: 30, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="chartIndex" 
+                          minTickGap={30}
+                          tickFormatter={(value) => {
+                            const pointIndex = Math.round(Number(value));
+                            const point = filteredGraphData[pointIndex];
+                            return point ? point.timeLabel : '';
+                          }}
                         />
-                      )}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                        <YAxis
+                          domain={['auto', 'auto']}
+                          width={80}
+                          label={{ value: yAxisLabel, angle: -90, position: 'left', dx: -18 }}
+                        />
+                        <Tooltip 
+                          formatter={(value, name) => {
+                            if (typeof value === 'number') {
+                              return [value.toFixed(2), name];
+                            }
+                            return [value, name];
+                          }}
+                          labelFormatter={(label) => {
+                            const pointIndex = Math.round(Number(label));
+                            const point = filteredGraphData[pointIndex];
+                            return point ? `Time: ${point.timeLabel}` : label;
+                          }}
+                        />
+                        <Legend />
+                        {graphMetric === "all" ? (
+                          <>
+                            <Line type="monotone" dataKey="surface_temp" stroke="#8884d8" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="Surface Temp" />
+                            <Line type="monotone" dataKey="air_temp" stroke="#82ca9d" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="Air Temp" />
+                            <Line type="monotone" dataKey="humidity" stroke="#ffc658" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="Humidity" />
+                          </>
+                        ) : graphMetric === "irradiance" ? (
+                          <>
+                            <Line type="monotone" dataKey="v450" stroke="#4169E1" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="450nm (Blue)" />
+                            <Line type="monotone" dataKey="b500" stroke="#00CED1" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="500nm (Cyan)" />
+                            <Line type="monotone" dataKey="g550" stroke="#32CD32" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="550nm (Green)" />
+                            <Line type="monotone" dataKey="y570" stroke="#FFD700" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="570nm (Yellow)" />
+                            <Line type="monotone" dataKey="o600" stroke="#FF8C00" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="600nm (Orange)" />
+                            <Line type="monotone" dataKey="r650" stroke="#DC143C" dot={pointDotStyle} activeDot={activePointDotStyle} strokeWidth={2} name="650nm (Red)" />
+                          </>
+                        ) : (
+                          <Line 
+                            type="monotone" 
+                            dataKey={graphMetric} 
+                            stroke={graphMetric === "surface_temp" ? "#8884d8" : "#82ca9d"} 
+                            dot={pointDotStyle}
+                            activeDot={activePointDotStyle}
+                            strokeWidth={2} 
+                            name={graphMetric === "surface_temp" ? "Surface Temp" : "Air Temp"} 
+                          />
+                        )}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )
               )}
             </div>
           )}
@@ -863,4 +917,3 @@ export default function Data() {
     </div>
   );
 }
-

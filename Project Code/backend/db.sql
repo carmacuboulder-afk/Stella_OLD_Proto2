@@ -134,6 +134,7 @@ CREATE TABLE data (
 
   range_m NUMERIC(5,3),
   range_uncertainty_m NUMERIC(5,4),
+  batch_number VARCHAR(64),
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   timestamp_iso8601 TIMESTAMPTZ NOT NULL

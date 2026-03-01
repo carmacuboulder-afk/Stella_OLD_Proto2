@@ -141,7 +141,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
               irradiance_860nm_near_infrared_wavelength_nm, irradiance_860nm_near_infrared_wavelength_uncertainty_nm,
               irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared, irradiance_860nm_near_infrared_irradiance_uncertainty_uW_per_cm_squared,
 
-              range_m, range_uncertainty_m
+              range_m, range_uncertainty_m, batch_number
             ) VALUES (
               $1, $2, $3,
               $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
@@ -149,7 +149,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
               $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
               $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49,
               $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61,
-              $62, $63
+              $62, $63, $64
             )`,
             [
               uploadId, deviceId, formatTimestamp(row.timestamp_iso8601),
@@ -196,7 +196,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
               row.irradiance_860nm_near_infrared_wavelength_nm, row.irradiance_860nm_near_infrared_wavelength_uncertainty_nm,
               row.irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared, row.irradiance_860nm_near_infrared_irradiance_uncertainty_uW_per_cm_squared,
 
-              row.range_m, row.range_uncertainty_m
+              row.range_m, row.range_uncertainty_m, row.batch_number || row.batch || null
             ]);
         }
 
@@ -218,6 +218,13 @@ const parseVal = (val) => {
   if (val === undefined || val === null || val === '--' || val === '') return null;
   const parsed = parseFloat(val);
   return isNaN(parsed) ? null : parsed;
+};
+
+const parseBatch = (val) => {
+  if (val === undefined || val === null) return null;
+  const normalized = `${val}`.trim();
+  if (normalized === '' || normalized === '--') return null;
+  return normalized;
 };
 
 // POST /api/uploads/live/start - Start a new live session
@@ -293,6 +300,7 @@ router.post('/live/data', async (req, res, next) => {
       upload_id: sessionId,
       device_id: deviceId,
       timestamp_iso8601: timestamp,
+      batch_number: parseBatch(liveData.batch_number ?? liveData.batch),
       
       // Environmental sensors
       surface_temperature_C: parseVal(liveData.surface_temp),
