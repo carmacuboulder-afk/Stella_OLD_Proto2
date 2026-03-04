@@ -63,15 +63,45 @@ export default function Data() {
     const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     return `${datePart}, ${timePart}`;
   };
+  const buildEvenlySpacedTicks = (pointCount, maxTicks = 6) => {
+    if (pointCount <= 0) return [];
+    if (pointCount === 1) return [0];
+
+    const desiredTickCount = Math.min(maxTicks, pointCount);
+    const lastIndex = pointCount - 1;
+    const step = lastIndex / (desiredTickCount - 1);
+    return Array.from({ length: desiredTickCount }, (_, i) =>
+      i === desiredTickCount - 1 ? lastIndex : i * step
+    );
+  };
 
   const availableBatchNumbers = Array.from(
     new Set(graphData.map((row) => row.batchNumber).filter(Boolean))
-  );
+  ).sort((a, b) => {
+    if (a === "Unspecified") return 1;
+    if (b === "Unspecified") return -1;
+
+    const aNum = Number(a);
+    const bNum = Number(b);
+    const aIsNumeric = Number.isFinite(aNum);
+    const bIsNumeric = Number.isFinite(bNum);
+
+    if (aIsNumeric && bIsNumeric) return aNum - bNum;
+    if (aIsNumeric) return -1;
+    if (bIsNumeric) return 1;
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+  });
 
   const filteredGraphData = graphData.filter((row) => row.batchNumber === selectedBatchNumber).map((row, index) => ({
     ...row,
     chartIndex: index,
   }));
+  const xAxisTicks = buildEvenlySpacedTicks(filteredGraphData.length, 3);
+  const formatXAxisTick = (value) => {
+    const pointIndex = Math.min(filteredGraphData.length - 1, Math.max(0, Math.round(value)));
+    const point = filteredGraphData[pointIndex];
+    return point ? point.timeLabel : "";
+  };
 
   const graphConfigurations = [
     {
@@ -706,7 +736,7 @@ export default function Data() {
   ];
 
   return (
-    <div style={{ textAlign: "center", padding: "20px", maxWidth: "1400px", margin: "0 auto" }}>
+    <div style={{ textAlign: "center", padding: "20px", maxWidth: "1680px", margin: "0 auto" }}>
 
 
       {/* tab toggle */}
@@ -873,10 +903,10 @@ export default function Data() {
               {loadingGraph ? <p>Loading data...</p> : (
                 filteredGraphData.length === 0 ? <p>No data points found for this batch.</p> : (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))", gap: "20px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(640px, 2.5fr))", gap: "30px" }}>
                       {graphConfigurations.map((config) => (
-                        <div key={config.key} style={{ border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>{config.title}</h4>
+                        <div key={config.key} style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}>
+                          <h4 style={{ margin: "0 0 16px 0", fontWeight: 700 }}>{config.title}</h4>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center", marginBottom: "10px" }}>
                             {config.lines.map((line) => (
                               <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
@@ -885,19 +915,24 @@ export default function Data() {
                               </div>
                             ))}
                           </div>
-                          <div style={{ width: '100%', height: 470 }}>
+                          <div style={{ width: '100%', height: 605 }}>
                             <ResponsiveContainer>
-                              <LineChart data={filteredGraphData} margin={{ top: 10, right: 20, left: 30, bottom: 20 }}>
+                              <LineChart data={filteredGraphData} margin={{ top: 10, right: 55, left: 30, bottom: 30 }}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis 
-                                  dataKey="timeLabel" 
-                                  height={55}
-                                  tickMargin={12}
-                                  interval="preserveStartEnd"
-                                  tick={{ fontWeight: 700, fill: '#000' }}
+                                  dataKey="chartIndex"
+                                  type="number"
+                                  domain={[0, Math.max(filteredGraphData.length - 1, 0)]}
+                                  ticks={xAxisTicks}
+                                  tickFormatter={formatXAxisTick}
+                                  allowDecimals={false}
+                                  interval={0}
+                                  height={65}
+                                  tickMargin={14}
+                                  padding={{ left: 0, right: 0 }}
+                                  tick={{ fontWeight: 700, fill: '#000', fontSize: 12 }}
                                   axisLine={{ stroke: '#000' }}
                                   tickLine={{ stroke: '#000' }}
-                                  minTickGap={30}
                                 />
                                 <YAxis
                                   domain={['auto', 'auto']}
