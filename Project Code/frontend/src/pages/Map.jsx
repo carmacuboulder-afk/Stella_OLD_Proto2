@@ -16,6 +16,7 @@ export default function Map() {
   const [missingUploads, setMissingUploads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMissingWindow, setShowMissingWindow] = useState(false);
+  const [editingCoords, setEditingCoords] = useState({});
 
   //TODO: When user registration/login/authentication finished, need to implement functionality.
   const TEMP_USER_ID = 1;
@@ -63,6 +64,51 @@ export default function Map() {
     fetchUserData();
   }, []);
 
+  const cancelEdit = (id) => {
+    setEditingCoords(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  }
+
+  const saveCoordinates = async (rowId) => {
+    const coords = editingCoords[rowId];
+    if (!coords || coords.lat === "" || coords.lng === "") {
+      alert("Please enter both latitude and longitude");
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/data/${rowId}/coordinates`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude: parseFloat(coords.lat),
+          longitude: parseFloat(coords.lng),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save coordinates");
+
+      // Update local state
+      setMissingUploads(prev => prev.filter(row => row.id !== rowId));
+      setMarkers(prev => [
+        ...prev,
+        {
+          ...markers.find(m => m.id === rowId) || {},
+          latitude: parseFloat(coords.lat),
+          longitude: parseFloat(coords.lng)
+        }
+      ]);
+
+      cancelEdit(rowId);
+    } catch (err) {
+      console.error("Error saving coordinates:", err);
+      alert("Failed to save coordinates. Check console.");
+    }
+  }
+
   if (loading) return <p>Loading map data...</p>;
 
   const boulderLat = 40.0190
@@ -70,26 +116,7 @@ export default function Map() {
 
   return (
     /* MAP */
-    <div>
-      <buttom id="dataNoCoordsButton" onClick={() => setShowMissingWindow(!showMissingWindow)}>{showMissingWindow ? "Hide Missing" : "Show Missing"}</buttom>
-      {showMissingWindow && (
-        <div id="dataNoCoordsWindow">
-          <h3>Data Missing Coordinates</h3>
-          {missingUploads.length === 0 ? (
-            <p>All rows have coordinates</p>
-          ) : (
-            missingUploads.map(row => (
-              <div id="noCoordEntry" key={row.upload_id}>
-                <strong>Upload ID:</strong> {row.upload_id}<br />
-                <strong>Device ID:</strong> {row.device_id}<br />
-                <strong>Recording ID:</strong> {row.id}<br />
-                <strong>Date:</strong> {Date(row.timestamp_iso8601)}<br />
-                <button>Add Coordinates</button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+    <div class="mapDiv">
       <MapContainer center={[boulderLat, boulderLong]} zoom={13}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> <a href="https://www.flaticon.com/free-icons/maps-and-location" title="maps and location icons">Icons by Iconpro86</a>'
@@ -111,7 +138,7 @@ export default function Map() {
                 click: (event) => open('data')
               }}
             >
-              <Popup>
+              <Popup class="mapPopup">
                 <strong>Upload:</strong> {row.upload_id}<br />
                 <strong>Recording:</strong> {row.id}<br />
                 <strong>Device:</strong> {row.device_id}<br />
@@ -122,6 +149,74 @@ export default function Map() {
           );
         })}
       </MapContainer>
+
+      {missingUploads.length != 0 && (
+        <button class = "mapButton" id="missingDataButton" onClick={() => setShowMissingWindow(!showMissingWindow)}>{showMissingWindow ? "Hide Missing" : "Show Missing"}</button>
+      )}
+      {showMissingWindow && (
+        <div class="mapWindow">
+          <h3>Data Missing Coordinates</h3>
+          {missingUploads.length === 0 ? (
+            <p>All rows have coordinates</p>
+          ) : (
+            missingUploads.map(row => (
+              <div class="noCoordEntry" key={row.upload_id}>
+                <strong>Upload ID:</strong> {row.upload_id}<br />
+                <strong>Device ID:</strong> {row.device_id}<br />
+                <strong>Recording ID:</strong> {row.id}<br />
+                <strong>Date:</strong> {Date(row.timestamp_iso8601)}<br />
+                {editingCoords[row.id] ? (
+                  <div class="addCoordsForm">
+                    <input
+                      type="number"
+                      step="any"
+                      min="-90"
+                      max="90"
+                      placeholder="Latitude"
+                      value={editingCoords[row.id].lat}
+                      onChange={(e) =>
+                        setEditingCoords(prev => ({
+                          ...prev,
+                          [row.id]: { ...prev[row.id], lat: e.target.value }
+                        }))
+                      }
+                    />
+                    <input
+                      type="number"
+                      step="any"
+                      min="-180"
+                      max="180"
+                      placeholder="Longitude"
+                      value={editingCoords[row.id].lng}
+                      onChange={(e) =>
+                        setEditingCoords(prev => ({
+                          ...prev,
+                          [row.id]: { ...prev[row.id], lng: e.target.value }
+                        }))
+                      }
+                    />
+                    <div class="formButtons">
+                      <button id="saveButton" onClick={() => saveCoordinates(row.id)}>Save</button>
+                      <button id="cancelButton" onClick={() => cancelEdit(row.id)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() =>
+                      setEditingCoords(prev => ({
+                        ...prev,
+                        [row.id]: { lat: "", lng: "" }
+                      }))
+                    }
+                  >
+                  Add Coordinates
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

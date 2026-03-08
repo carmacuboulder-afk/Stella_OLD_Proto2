@@ -42,4 +42,21 @@ router.get('/upload/:uploadId', async (req, res, next) => {
   }
 });
 
+// PUT /api/data/:id/coordinates
+router.put('/:id/coordinates', async (req, res) => {
+  const { latitude, longitude } = req.body;
+  const { id } = req.params;
+
+  try {
+    await pool.query(
+      'UPDATE data SET latitude = $1, longitude = $2 WHERE id = $3',
+      [latitude, longitude, id]
+    );
+    res.status(200).json({ message: 'Coordinates updated!' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
