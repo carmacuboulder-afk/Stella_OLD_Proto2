@@ -262,6 +262,9 @@ export default function Data() {
         const n810 = parseFloat(row.irradiance_810nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
         const n860 = parseFloat(row.irradiance_860nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
         const totalIrradiance = v450 + b500 + g550 + y570 + o600 + n610 + r650 + n680 + n730 + n760 + n810 + n860;
+        //These are relative spectral contribution/spectral fractions rather than reflectance
+        //Either we require them to measure a reference of white (that is a white reference needs to be in the data) OR
+        //We can do a rough estimate by getting the max normalization per wavelength and treat that as the reference to white (this is an estimate and I am not sure how good this is)
         const refl450 = safeDivide(v450, totalIrradiance);
         const refl500 = safeDivide(b500, totalIrradiance);
         const refl550 = safeDivide(g550, totalIrradiance);
