@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Link } from "react-router-dom";
 
 export default function Data() {
   const [activeTab, setActiveTab] = useState("history");
 
   const [uploads, setUploads] = useState([]);
   const [selectedUploadId, setSelectedUploadId] = useState(null);
+  const [rawUploadRows, setRawUploadRows] = useState([]);
   const [graphData, setGraphData] = useState([]);
   const [loadingGraph, setLoadingGraph] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -15,6 +17,8 @@ export default function Data() {
   const [savingNoteId, setSavingNoteId] = useState(null);
 
   const [selectedBatchNumber, setSelectedBatchNumber] = useState("");
+  const [selectedRedWavelength, setSelectedRedWavelength] = useState("680");
+  const [selectedNirWavelength, setSelectedNirWavelength] = useState("810");
 
   const [isConnected, setIsConnected] = useState(false);
   const [status, setStatus] = useState("");
@@ -58,6 +62,22 @@ export default function Data() {
   const pointDotStyle = { r: 1.5, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
   const activePointDotStyle = { r: 2.5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
   const safeDivide = (numerator, denominator) => (denominator ? numerator / denominator : 0);
+  const wavelengthBands = [
+    { nm: "450", rawKey: "v450", reflectanceKey: "refl450", label: "450nm", color: "#6A5ACD" },
+    { nm: "500", rawKey: "b500", reflectanceKey: "refl500", label: "500nm", color: "#00CED1" },
+    { nm: "550", rawKey: "g550", reflectanceKey: "refl550", label: "550nm", color: "#32CD32" },
+    { nm: "570", rawKey: "y570", reflectanceKey: "refl570", label: "570nm", color: "#FFD700" },
+    { nm: "600", rawKey: "o600", reflectanceKey: "refl600", label: "600nm", color: "#FF8C00" },
+    { nm: "610", rawKey: "n610", reflectanceKey: "refl610", label: "610nm", color: "#CD853F" },
+    { nm: "650", rawKey: "r650", reflectanceKey: "refl650", label: "650nm", color: "#DC143C" },
+    { nm: "680", rawKey: "n680", reflectanceKey: "refl680", label: "680nm", color: "#8B0000" },
+    { nm: "730", rawKey: "n730", reflectanceKey: "refl730", label: "730nm", color: "#8A2BE2" },
+    { nm: "760", rawKey: "n760", reflectanceKey: "refl760", label: "760nm", color: "#4B0082" },
+    { nm: "810", rawKey: "n810", reflectanceKey: "refl810", label: "810nm", color: "#191970" },
+    { nm: "860", rawKey: "n860", reflectanceKey: "refl860", label: "860nm", color: "#000000" },
+  ];
+  const wavelengthLookup = Object.fromEntries(wavelengthBands.map((band) => [band.nm, band]));
+  const reflectanceMetadataLabel = "Estimated reflectance";
   const formatTimeLabel = (date) => {
     const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -102,7 +122,6 @@ export default function Data() {
     const point = filteredGraphData[pointIndex];
     return point ? point.timeLabel : "";
   };
-
   const graphConfigurations = [
     {
       key: "raw_visible",
@@ -224,6 +243,77 @@ export default function Data() {
     }
   }, [availableBatchNumbers, selectedBatchNumber]);
 
+  useEffect(() => {
+    if (rawUploadRows.length === 0) {
+      setGraphData([]);
+      return;
+    }
+
+    const bandMaximums = wavelengthBands.reduce((accumulator, band) => {
+      const maxValue = rawUploadRows.reduce((currentMax, row) => {
+        const nextValue = Number(row[band.rawKey]) || 0;
+        return Math.max(currentMax, nextValue);
+      }, 0);
+
+      accumulator[band.nm] = maxValue;
+      return accumulator;
+    }, {});
+
+    const selectedRedBand = wavelengthLookup[selectedRedWavelength];
+    const selectedNirBand = wavelengthLookup[selectedNirWavelength];
+    const dswiRedBand = wavelengthLookup["680"];
+    const greenBand = wavelengthLookup["550"];
+
+    const formatted = rawUploadRows.map((row, index) => {
+      const reflectanceValues = wavelengthBands.reduce((accumulator, band) => {
+        accumulator[band.reflectanceKey] = safeDivide(Number(row[band.rawKey]) || 0, bandMaximums[band.nm]); //currently I am not imcorporating compensator. - xav
+        return accumulator;
+      }, {});
+
+      const selectedRedReflectance = reflectanceValues[selectedRedBand.reflectanceKey];
+      const selectedNirReflectance = reflectanceValues[selectedNirBand.reflectanceKey];
+      const dswiGreenReflectance = reflectanceValues[greenBand.reflectanceKey];
+      const dswiRedReflectance = reflectanceValues[dswiRedBand.reflectanceKey];
+      //all following variables use reflectance, not raw irradiance
+      const ndvi = safeDivide(
+        selectedNirReflectance - selectedRedReflectance,
+        selectedNirReflectance + selectedRedReflectance
+      );
+      const sr = safeDivide(selectedNirReflectance, selectedRedReflectance);
+      const dswi4 = safeDivide(
+        selectedNirReflectance - dswiGreenReflectance,
+        dswiRedReflectance + dswiGreenReflectance
+      );
+      const nirv = ndvi * selectedNirReflectance;
+
+      return {
+        ...row,
+        id: index,
+        ...reflectanceValues,
+        ndvi,
+        sr,
+        dswi4,
+        nirv,
+        calculationMetadata: {
+          redWavelength: selectedRedWavelength,
+          nirWavelength: selectedNirWavelength,
+          greenWavelength: "550",
+          dswiRedWavelength: "680",
+          reflectanceMode: reflectanceMetadataLabel,
+        },
+      };
+    });
+
+    setGraphData(formatted);
+    setNoteDrafts((previous) => {
+      const nextDrafts = { ...previous };
+      formatted.forEach((row) => {
+        nextDrafts[row.dataPointId] = previous[row.dataPointId] ?? row.note ?? "";
+      });
+      return nextDrafts;
+    });
+  }, [rawUploadRows, selectedRedWavelength, selectedNirWavelength]);
+
   const fetchUploads = async () => {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads`);
@@ -237,6 +327,7 @@ export default function Data() {
   const handleSelectUpload = async (uploadId) => {
     setSelectedUploadId(uploadId);
     setSelectedBatchNumber("");
+    setRawUploadRows([]);
     setLoadingGraph(true);
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/${uploadId}/data`);
@@ -261,30 +352,9 @@ export default function Data() {
         const n760 = parseFloat(row.irradiance_760nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
         const n810 = parseFloat(row.irradiance_810nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
         const n860 = parseFloat(row.irradiance_860nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
-        const totalIrradiance = v450 + b500 + g550 + y570 + o600 + n610 + r650 + n680 + n730 + n760 + n810 + n860;
-        //These are relative spectral contribution/spectral fractions rather than reflectance
-        //Either we require them to measure a reference of white (that is a white reference needs to be in the data) OR
-        //We can do a rough estimate by getting the max normalization per wavelength and treat that as the reference to white (this is an estimate and I am not sure how good this is)
-        const refl450 = safeDivide(v450, totalIrradiance);
-        const refl500 = safeDivide(b500, totalIrradiance);
-        const refl550 = safeDivide(g550, totalIrradiance);
-        const refl570 = safeDivide(y570, totalIrradiance);
-        const refl600 = safeDivide(o600, totalIrradiance);
-        const refl610 = safeDivide(n610, totalIrradiance);
-        const refl650 = safeDivide(r650, totalIrradiance);
-        const refl680 = safeDivide(n680, totalIrradiance);
-        const refl730 = safeDivide(n730, totalIrradiance);
-        const refl760 = safeDivide(n760, totalIrradiance);
-        const refl810 = safeDivide(n810, totalIrradiance);
-        const refl860 = safeDivide(n860, totalIrradiance);
-        const ndvi = safeDivide(n860 - r650, n860 + r650);
-        const sr = safeDivide(n860, r650);
-        // DSWI 4 approximation based on available STELLA bands.
-        const dswi4 = safeDivide(n860 + g550, n680 + r650);
-        const nirv = ndvi * refl860;
 
         return {
-          id: index,  // Unique identifier for each data point
+          id: index,
           dataPointId: row.id,
           timestamp: row.timestamp_iso8601,
           batchNumber,
@@ -307,30 +377,10 @@ export default function Data() {
           n760,
           n810,
           n860,
-          // Reflectance and vegetation indices
-          refl450,
-          refl500,
-          refl550,
-          refl570,
-          refl600,
-          refl610,
-          refl650,
-          refl680,
-          refl730,
-          refl760,
-          refl810,
-          refl860,
-          ndvi,
-          sr,
-          dswi4,
-          nirv,
         };
       });
 
-      setGraphData(formatted);
-      setNoteDrafts(
-        Object.fromEntries(formatted.map((row) => [row.dataPointId, row.note || ""]))
-      );
+      setRawUploadRows(formatted);
     } catch (err) {
       console.error("Failed to fetch graph data", err);
     } finally {
@@ -872,9 +922,21 @@ export default function Data() {
             <div style={{ marginBottom: "50px", padding: "20px", border: "2px solid #000", borderRadius: "10px" }}>
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h3 style={{ margin: 0, fontWeight: 700 }}>Data Graphs</h3>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
+                  <h3 style={{ margin: 0, fontWeight: 700 }}>Data Graphs</h3>
+                  <Link
+                    to="/docs"
+                    style={{
+                      fontSize: "13px",
+                      color: "#1f6feb",
+                      textDecoration: "underline"
+                    }}
+                  >
+                    More info on graph formulas and interpretation
+                  </Link>
+                </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
                     Batch
                   </label>
@@ -900,9 +962,54 @@ export default function Data() {
                       ))
                     )}
                   </select>
+
+                  <label htmlFor="red-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                    RED
+                  </label>
+                  <select
+                    id="red-band-filter"
+                    value={selectedRedWavelength}
+                    onChange={(e) => setSelectedRedWavelength(e.target.value)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "4px",
+                      border: "1px solid #ccc",
+                      backgroundColor: "white",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {wavelengthBands.map((band) => (
+                      <option key={`red-${band.nm}`} value={band.nm}>
+                        {band.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label htmlFor="nir-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                    NIR
+                  </label>
+                  <select
+                    id="nir-band-filter"
+                    value={selectedNirWavelength}
+                    onChange={(e) => setSelectedNirWavelength(e.target.value)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "4px",
+                      border: "1px solid #ccc",
+                      backgroundColor: "white",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {wavelengthBands.map((band) => (
+                      <option key={`nir-${band.nm}`} value={band.nm}>
+                        {band.label}
+                      </option>
+                    ))}
+                  </select>
+
                 </div>
               </div>
-              
+
               {loadingGraph ? <p>Loading data...</p> : (
                 filteredGraphData.length === 0 ? <p>No data points found for this batch.</p> : (
                   <>
@@ -962,7 +1069,9 @@ export default function Data() {
                                     if (typeof label === 'string') return `Time: ${label}`;
                                     const pointIndex = Math.round(Number(label));
                                     const point = filteredGraphData[pointIndex];
-                                    return point ? `Time: ${point.timeLabel}` : `Time: ${label}`;
+                                    if (!point) return `Time: ${label}`;
+                                    const metadata = point.calculationMetadata;
+                                    return `Time: ${point.timeLabel} | RED ${metadata.redWavelength}nm | NIR ${metadata.nirWavelength}nm`;
                                   }}
                                 />
                                 {config.lines.map((line) => (
