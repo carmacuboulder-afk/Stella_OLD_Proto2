@@ -6,6 +6,7 @@
   padding: 40px 120px 56px;
   border-radius: 12px;
   box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+  background-color: #c7dbc4;
 }
 
 
@@ -21,6 +22,7 @@
     border-radius: 6px;
     width: 200px;
     padding: 5px;
+    background-color: white;
 }
 
 .register i {
