@@ -6,6 +6,21 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import { Icon } from "leaflet";
 
+import { useMap } from "react-leaflet";
+// import { useEffect } from "react";
+
+function RecenterMap({ lat, lng }) {
+    const map = useMap();
+
+    useEffect(() => {
+      if (lat && lng) {
+        map.setView([lat, lng], 14);
+      }
+    }, [lat, lng, map]);
+
+    return null;
+}
+
 const stellaIcon = new Icon({
   iconUrl: require("../img/pin.png"),
   iconSize: [30, 30]
@@ -17,6 +32,13 @@ export default function Map() {
   const [loading, setLoading] = useState(true);
   const [showMissingWindow, setShowMissingWindow] = useState(false);
   const [editingCoords, setEditingCoords] = useState({});
+
+  //Search Bar additions
+  const [inputLat, setInputLat] = useState("");
+  const [inputLng, setInputLng] = useState("");
+  const [searchLat, setSearchLat] = useState(null);
+  const [searchLng, setSearchLng] = useState(null);
+
 
   //TODO: When user registration/login/authentication finished, need to implement functionality.
   const TEMP_USER_ID = 1;
@@ -117,7 +139,75 @@ export default function Map() {
   return (
     /* MAP */
     <div class="mapDiv">
+      <div style={{ position: "relative" }}>
+      <div
+        style={{
+            position: "absolute",
+            top: "20px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1000,
+            background: "#9cbc98",
+            padding: "10px 14px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            display: "flex",
+            gap: "8px",
+            alignItems: "center"
+        }}
+      >
+        <input
+            type="number"
+            placeholder="Latitude"
+            value={inputLat}
+            onChange={(e) => setInputLat(e.target.value)}
+            style={{
+                padding: "6px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                width: "120px",
+                background: "white",
+            }}
+        />
+
+
+        <input
+            type="number"
+            placeholder="Longitude"
+            value={inputLng}
+            onChange={(e) => setInputLng(e.target.value)}
+            style={{
+                padding: "6px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+                width: "120px",
+                background: "white",
+            }}
+        />
+
+
+        <button
+            onClick={() => {
+                setSearchLat(parseFloat(inputLat));
+                setSearchLng(parseFloat(inputLng));
+            }}
+            style={{
+                backgroundColor: "white",
+                color: "#9cbc98",
+                border: "none",
+                padding: "6px 14px",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                cursor: "pointer"
+            }}
+        >
+           Go
+        </button>
+      </div>
+
+
       <MapContainer center={[boulderLat, boulderLong]} zoom={13}>
+        <RecenterMap lat={searchLat} lng={searchLng} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> <a href="https://www.flaticon.com/free-icons/maps-and-location" title="maps and location icons">Icons by Iconpro86</a>'
           url = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -149,6 +239,7 @@ export default function Map() {
           );
         })}
       </MapContainer>
+      </div>
 
       {missingUploads.length != 0 && (
         <button class = "mapButton" id="missingDataButton" onClick={() => setShowMissingWindow(!showMissingWindow)}>{showMissingWindow ? "Hide Missing" : "Show Missing"}</button>
