@@ -12,9 +12,9 @@ export default function Data() {
   const [loadingGraph, setLoadingGraph] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState("");
-  const [noteDrafts, setNoteDrafts] = useState({});
-  const [noteSaveStatus, setNoteSaveStatus] = useState({});
-  const [savingNoteId, setSavingNoteId] = useState(null);
+  const [batchNoteDrafts, setBatchNoteDrafts] = useState({});
+  const [batchNoteSaveStatus, setBatchNoteSaveStatus] = useState({});
+  const [savingBatchNumber, setSavingBatchNumber] = useState(null);
 
   const [selectedBatchNumber, setSelectedBatchNumber] = useState("");
   const [selectedRedWavelength, setSelectedRedWavelength] = useState("680");
@@ -305,10 +305,14 @@ export default function Data() {
     });
 
     setGraphData(formatted);
-    setNoteDrafts((previous) => {
+    setBatchNoteDrafts((previous) => {
       const nextDrafts = { ...previous };
       formatted.forEach((row) => {
-        nextDrafts[row.dataPointId] = previous[row.dataPointId] ?? row.note ?? "";
+        if (!(row.batchNumber in nextDrafts)) {
+          nextDrafts[row.batchNumber] = previous[row.batchNumber] ?? row.note ?? "";
+        } else if (!nextDrafts[row.batchNumber] && row.note) {
+          nextDrafts[row.batchNumber] = row.note;
+        }
       });
       return nextDrafts;
     });
@@ -328,6 +332,8 @@ export default function Data() {
     setSelectedUploadId(uploadId);
     setSelectedBatchNumber("");
     setRawUploadRows([]);
+    setBatchNoteDrafts({});
+    setBatchNoteSaveStatus({});
     setLoadingGraph(true);
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/${uploadId}/data`);
@@ -388,24 +394,28 @@ export default function Data() {
     }
   };
 
-  const handleNoteDraftChange = (dataPointId, value) => {
-    setNoteDrafts((prev) => ({
+  const handleBatchNoteDraftChange = (batchNumber, value) => {
+    setBatchNoteDrafts((prev) => ({
       ...prev,
-      [dataPointId]: value,
+      [batchNumber]: value,
     }));
   };
 
-  const handleSaveNote = async (dataPointId) => {
-    if (!dataPointId) return;
-    const note = noteDrafts[dataPointId] ?? "";
-    setSavingNoteId(dataPointId);
-    setNoteSaveStatus((prev) => ({ ...prev, [dataPointId]: "" }));
+  const handleSaveBatchNote = async () => {
+    if (!selectedUploadId || !selectedBatchNumber) return;
+    const note = batchNoteDrafts[selectedBatchNumber] ?? "";
+    setSavingBatchNumber(selectedBatchNumber);
+    setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchNumber]: "" }));
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/data/${dataPointId}/note`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/data/batch-note`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note }),
+        body: JSON.stringify({
+          uploadId: selectedUploadId,
+          batchNumber: selectedBatchNumber,
+          note,
+        }),
       });
 
       const responseBody = await res.json();
@@ -413,16 +423,25 @@ export default function Data() {
         throw new Error(responseBody.error || 'Failed to save note');
       }
 
+      setBatchNoteDrafts((prev) => ({
+        ...prev,
+        [selectedBatchNumber]: responseBody.note ?? '',
+      }));
       setGraphData((prev) =>
         prev.map((row) =>
-          row.dataPointId === dataPointId ? { ...row, note: responseBody.note ?? "" } : row
+          row.batchNumber === selectedBatchNumber ? { ...row, note: responseBody.note ?? "" } : row
         )
       );
-      setNoteSaveStatus((prev) => ({ ...prev, [dataPointId]: "Saved" }));
+      setRawUploadRows((prev) =>
+        prev.map((row) =>
+          row.batchNumber === selectedBatchNumber ? { ...row, note: responseBody.note ?? "" } : row
+        )
+      );
+      setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchNumber]: "Saved" }));
     } catch (error) {
-      setNoteSaveStatus((prev) => ({ ...prev, [dataPointId]: "Save failed" }));
+      setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchNumber]: "Save failed" }));
     } finally {
-      setSavingNoteId(null);
+      setSavingBatchNumber(null);
     }
   };
 
@@ -1094,63 +1113,53 @@ export default function Data() {
                     </div>
 
                     <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
-                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Data Point Notes</h4>
+                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Batch Note</h4>
                       <p style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#555" }}>
-                        Add or update notes for any point in the selected batch.
+                        Add or update one note for the selected batch.
                       </p>
-                      <div style={{ maxHeight: "320px", overflowY: "auto" }}>
-                        {filteredGraphData.map((point) => (
-                          <div
-                            key={`note-${point.dataPointId}`}
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "170px 1fr auto auto",
-                              gap: "8px",
-                              alignItems: "center",
-                              padding: "8px 0",
-                              borderBottom: "1px solid #eee"
-                            }}
-                          >
-                            <div style={{ fontSize: "12px", color: "#333" }}>{point.timeLabel}</div>
-                            <input
-                              type="text"
-                              value={noteDrafts[point.dataPointId] ?? ""}
-                              onChange={(e) => handleNoteDraftChange(point.dataPointId, e.target.value)}
-                              placeholder="Add note for this data point"
-                              style={{
-                                width: "100%",
-                                padding: "7px 9px",
-                                borderRadius: "4px",
-                                border: "1px solid #bbb"
-                              }}
-                            />
-                            <button
-                              onClick={() => handleSaveNote(point.dataPointId)}
-                              disabled={savingNoteId === point.dataPointId}
-                              style={{
-                                padding: "7px 12px",
-                                borderRadius: "4px",
-                                border: "none",
-                                cursor: "pointer",
-                                backgroundColor: savingNoteId === point.dataPointId ? "#ccc" : "#1f6feb",
-                                color: "white"
-                              }}
-                            >
-                              {savingNoteId === point.dataPointId ? "Saving..." : "Save"}
-                            </button>
-                            <span
-                              style={{
-                                minWidth: "70px",
-                                fontSize: "12px",
-                                color: noteSaveStatus[point.dataPointId]
-                                  ? (noteSaveStatus[point.dataPointId] === "Saved" ? "green" : "red")
-                                  : "#555"
-                              }}
-                            >
-                              {noteSaveStatus[point.dataPointId] || ""}
-                            </span>
-                          </div>
-                        ))}
+                      <div style={{ fontSize: "13px", marginBottom: "8px", color: "#333" }}>
+                        Selected batch: {selectedBatchNumber === "Unspecified" ? "Unspecified" : `Batch ${selectedBatchNumber}`}
+                      </div>
+                      <textarea
+                        value={batchNoteDrafts[selectedBatchNumber] ?? ""}
+                        onChange={(e) => handleBatchNoteDraftChange(selectedBatchNumber, e.target.value)}
+                        placeholder="Add note for this batch"
+                        rows={3}
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "4px",
+                          border: "1px solid #bbb",
+                          resize: "vertical",
+                          boxSizing: "border-box"
+                        }}
+                      />
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+                        <button
+                          onClick={handleSaveBatchNote}
+                          disabled={!selectedBatchNumber || savingBatchNumber === selectedBatchNumber}
+                          style={{
+                            padding: "7px 12px",
+                            borderRadius: "4px",
+                            border: "none",
+                            cursor: "pointer",
+                            backgroundColor: savingBatchNumber === selectedBatchNumber ? "#ccc" : "#1f6feb",
+                            color: "white"
+                          }}
+                        >
+                          {savingBatchNumber === selectedBatchNumber ? "Saving..." : "Save"}
+                        </button>
+                        <span
+                          style={{
+                            minWidth: "70px",
+                            fontSize: "12px",
+                            color: batchNoteSaveStatus[selectedBatchNumber]
+                              ? (batchNoteSaveStatus[selectedBatchNumber] === "Saved" ? "green" : "red")
+                              : "#555"
+                          }}
+                        >
+                          {batchNoteSaveStatus[selectedBatchNumber] || ""}
+                        </span>
                       </div>
                     </div>
                   </>

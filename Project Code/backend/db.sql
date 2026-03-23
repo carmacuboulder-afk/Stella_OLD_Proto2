@@ -135,10 +135,19 @@ CREATE TABLE data (
   range_m NUMERIC(5,3),
   range_uncertainty_m NUMERIC(5,4),
   batch_number VARCHAR(64),
-  note VARCHAR(511),
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   timestamp_iso8601 TIMESTAMPTZ NOT NULL
+);
+
+-- BATCH NOTES
+CREATE TABLE batch_notes (
+  upload_id BIGINT NOT NULL,
+  batch_number VARCHAR(64) NOT NULL DEFAULT '',
+  note VARCHAR(511) NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (upload_id, batch_number)
 );
 
 -- Foreign Keys
@@ -166,6 +175,10 @@ ALTER TABLE data
   ADD CONSTRAINT data_device_fk
   FOREIGN KEY (device_id) REFERENCES devices(id);
 
+ALTER TABLE batch_notes
+  ADD CONSTRAINT batch_notes_upload_fk
+  FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE;
+
 -- Indexes to speed up queries
 CREATE INDEX idx_team_members_user_id ON team_members(user_id);   -- Shows all teams from user
 CREATE INDEX idx_team_members_team_id ON team_members(team_id);   -- Shows all users from team
@@ -177,3 +190,4 @@ CREATE INDEX idx_uploads_timestamp ON uploads(timestamp_iso8601); -- Shows all u
 
 CREATE INDEX idx_data_upload_id ON data(upload_id);               -- Show all data for this upload 
 CREATE INDEX idx_data_device_id ON data(device_id);               -- Show all data for this device
+CREATE INDEX idx_batch_notes_upload_id ON batch_notes(upload_id); -- Show all batch notes for this upload

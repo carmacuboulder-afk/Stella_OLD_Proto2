@@ -380,7 +380,13 @@ router.post('/live/end', async (req, res, next) => {
 router.get('/:id/data', async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM data WHERE upload_id = $1 ORDER BY timestamp_iso8601 ASC',
+      `SELECT d.*, COALESCE(bn.note, '') AS note
+       FROM data d
+       LEFT JOIN batch_notes bn
+         ON bn.upload_id = d.upload_id
+        AND bn.batch_number = COALESCE(NULLIF(BTRIM(d.batch_number), ''), '')
+       WHERE d.upload_id = $1
+       ORDER BY d.timestamp_iso8601 ASC`,
       [req.params.id]
     );
     res.json(result.rows);

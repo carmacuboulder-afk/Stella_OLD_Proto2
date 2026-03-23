@@ -29,11 +29,14 @@ router.post('/', async (req, res, next) => {
 // GET /api/data/upload/:uploadId
 router.get('/upload/:uploadId', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT *
-       FROM data
-       WHERE upload_id = $1
-       ORDER BY id`,
+    const result = await pool.query( //coalesce handles empty notes
+      `SELECT d.*, COALESCE(bn.note, '') AS note
+       FROM data d
+       LEFT JOIN batch_notes bn
+         ON bn.upload_id = d.upload_id
+        AND bn.batch_number = COALESCE(NULLIF(BTRIM(d.batch_number), ''), '')
+       WHERE d.upload_id = $1
+       ORDER BY d.id`,
       [req.params.uploadId]
     );
     res.json(result.rows);
@@ -42,24 +45,42 @@ router.get('/upload/:uploadId', async (req, res, next) => {
   }
 });
 
-// PUT /api/data/:id/note
-router.put('/:id/note', async (req, res, next) => {
-  const { note } = req.body;
+// PUT /api/data/batch-note
+router.put('/batch-note', async (req, res, next) => {
+  const { uploadId, batchNumber, note } = req.body;
+  const normalizedBatchNumber = `${batchNumber ?? ''}`.trim();
+  const storedBatchNumber = normalizedBatchNumber === 'Unspecified' ? '' : normalizedBatchNumber;
 
   try {
-    const result = await pool.query(
-      `UPDATE data
-       SET note = $1
-       WHERE id = $2
-       RETURNING id, note`,
-      [note ?? '', req.params.id]
+    const batchExists = await pool.query(
+      `SELECT 1
+       FROM data
+       WHERE upload_id = $1
+         AND COALESCE(NULLIF(BTRIM(batch_number), ''), '') = $2
+       LIMIT 1`,
+      [uploadId, storedBatchNumber]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Data point not found' });
+    if (batchExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Batch not found for this upload' });
     }
 
-    res.json(result.rows[0]);
+    const result = await pool.query(
+      `INSERT INTO batch_notes (upload_id, batch_number, note)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (upload_id, batch_number)
+       DO UPDATE SET
+         note = EXCLUDED.note,
+         updated_at = NOW()
+       RETURNING upload_id, batch_number, note`,
+      [uploadId, storedBatchNumber, note ?? '']
+    );
+
+    res.json({
+      uploadId: result.rows[0].upload_id,
+      batchNumber: result.rows[0].batch_number || 'Unspecified',
+      note: result.rows[0].note ?? '',
+    });
   } catch (err) {
     next(err);
   }
