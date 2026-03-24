@@ -45,6 +45,11 @@
   font-weight: 600;
 }
 
+/* logout link style */
+.logout-button {
+  font-weight: 500;
+}
+
 .account-menu,
 .resources-menu {
   position: relative;
@@ -58,11 +63,12 @@
   font-size: 1.1rem;
   color: black;
   padding: 0;
+  font-weight: 500;
 }
 
 .account-btn
 .resources-btn { 
-  font-weight: 500; 
+  font-weight: 500;
 }
 
 .account-btn:hover,
