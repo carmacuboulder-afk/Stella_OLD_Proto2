@@ -8,15 +8,20 @@ export default function FAQ() {
       <p className="faq-intro">Find quick solutions and helpful tips for building your STELLA device, uploading data, and exploring your measurements on the map.</p>
       <h2>General</h2>
       <ul>
-        <li>What is STELLA and what does it do?</li>
-        <p>Loren ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. </p>
-        <li>What’s the difference between STELLA 1.1 and STELLA 1.2?</li>
+        <li>What is STELLA, and what does it do?</li>
+        <p>
+          STELLA (Science and Technology Education for Land/Life Assessment) is a portable environmental sensing system developed by NASA to collect real-time data about the Earth’s surface.
+          It uses advanced sensors to measure properties such as light reflectance, temperature, and other environmental conditions. 
+          This data helps scientists, students, and researchers better understand ecosystems, monitor environmental changes, and support climate research.
+
+        </p>
+        <li>What’s the difference between STELLA 1.1 and STELLA 1.2?*</li>
         <p>Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
           Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. </p>
       </ul>
       <h2>Uploading Data</h2>
       <ul>
-        <li>What file types can I upload?</li>
+        <li>What file types can I upload?*</li>
         <p>Accepted file formats (CSV, JSON, etc.)</p>
         <li>Can I manually enter coordinates if my data doesn’t include GPS?</li>
         <p>Loren ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 

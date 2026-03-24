@@ -41,16 +41,26 @@ export default function Navbar({loggedIn, setLoggedIn}) {
       </div>
 
       <div className="navbar-links">
-        <Link to="/docs">Documentation</Link>
         <Link to="/data">Data</Link>
         <Link to="/map">Map</Link>
-        <Link to="/about">About Us</Link>
-        <Link to="/faq">FAQ</Link>
-        {loggedIn 
-          ? <>
-              <Link to="/login" onClick={handleLogout}>Logout</Link>
-              <Link to="/account">Account</Link>
-            </> 
+        <div className="resources-menu">
+          <button className="resources-btn">Resources ▾</button>
+          <div className="resources-dropdown">
+            <Link to="/about">About Us</Link>
+            <Link to="/faq">FAQ</Link>
+            <Link to="/docs">Documentation</Link>
+          </div>
+        </div>
+        {loggedIn
+          ? (
+            <div className="account-menu">
+              <button className="account-btn">Account ▾</button>
+              <div className="account-dropdown">
+                <Link to="/account">My Account</Link>
+                <button onClick={handleLogout}>Logout</button>
+              </div>
+            </div>
+          )
           : <Link to="/login" className="login-link">Login</Link>
         }
       </div>
