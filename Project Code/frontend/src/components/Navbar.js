@@ -57,7 +57,7 @@ export default function Navbar({loggedIn, setLoggedIn}) {
               <button className="account-btn">Account ▾</button>
               <div className="account-dropdown">
                 <Link to="/account">My Account</Link>
-                <button onClick={handleLogout}>Logout</button>
+                <button onClick={handleLogout} className="logout-button">Logout</button>
               </div>
             </div>
           )
