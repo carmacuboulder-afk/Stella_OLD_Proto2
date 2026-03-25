@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Link } from "react-router-dom";
 
 export default function Data() {
@@ -17,6 +17,7 @@ export default function Data() {
   const [savingBatchNumber, setSavingBatchNumber] = useState(null);
 
   const [selectedBatchNumber, setSelectedBatchNumber] = useState("");
+  const [selectedTimestampIndex, setSelectedTimestampIndex] = useState(0);
   const [selectedRedWavelength, setSelectedRedWavelength] = useState("680");
   const [selectedNirWavelength, setSelectedNirWavelength] = useState("810");
 
@@ -61,20 +62,33 @@ export default function Data() {
 
   const pointDotStyle = { r: 1.5, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
   const activePointDotStyle = { r: 2.5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
+  const formatNumberWithCommas = (value, maximumFractionDigits = 4) =>
+    Number(value).toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits,
+    });
+  const parseOptionalNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const toFiniteNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
   const safeDivide = (numerator, denominator) => (denominator ? numerator / denominator : 0);
   const wavelengthBands = [
-    { nm: "450", rawKey: "v450", reflectanceKey: "refl450", label: "450nm", color: "#6A5ACD" },
-    { nm: "500", rawKey: "b500", reflectanceKey: "refl500", label: "500nm", color: "#00CED1" },
-    { nm: "550", rawKey: "g550", reflectanceKey: "refl550", label: "550nm", color: "#32CD32" },
-    { nm: "570", rawKey: "y570", reflectanceKey: "refl570", label: "570nm", color: "#FFD700" },
-    { nm: "600", rawKey: "o600", reflectanceKey: "refl600", label: "600nm", color: "#FF8C00" },
-    { nm: "610", rawKey: "n610", reflectanceKey: "refl610", label: "610nm", color: "#CD853F" },
-    { nm: "650", rawKey: "r650", reflectanceKey: "refl650", label: "650nm", color: "#DC143C" },
-    { nm: "680", rawKey: "n680", reflectanceKey: "refl680", label: "680nm", color: "#8B0000" },
-    { nm: "730", rawKey: "n730", reflectanceKey: "refl730", label: "730nm", color: "#8A2BE2" },
-    { nm: "760", rawKey: "n760", reflectanceKey: "refl760", label: "760nm", color: "#4B0082" },
-    { nm: "810", rawKey: "n810", reflectanceKey: "refl810", label: "810nm", color: "#191970" },
-    { nm: "860", rawKey: "n860", reflectanceKey: "refl860", label: "860nm", color: "#000000" },
+    { nm: "450", wavelengthKey: "w450", rawKey: "v450", reflectanceKey: "refl450", label: "450nm", color: "#6A5ACD" },
+    { nm: "500", wavelengthKey: "w500", rawKey: "b500", reflectanceKey: "refl500", label: "500nm", color: "#00CED1" },
+    { nm: "550", wavelengthKey: "w550", rawKey: "g550", reflectanceKey: "refl550", label: "550nm", color: "#32CD32" },
+    { nm: "570", wavelengthKey: "w570", rawKey: "y570", reflectanceKey: "refl570", label: "570nm", color: "#FFD700" },
+    { nm: "600", wavelengthKey: "w600", rawKey: "o600", reflectanceKey: "refl600", label: "600nm", color: "#FF8C00" },
+    { nm: "610", wavelengthKey: "w610", rawKey: "n610", reflectanceKey: "refl610", label: "610nm", color: "#CD853F" },
+    { nm: "650", wavelengthKey: "w650", rawKey: "r650", reflectanceKey: "refl650", label: "650nm", color: "#DC143C" },
+    { nm: "680", wavelengthKey: "w680", rawKey: "n680", reflectanceKey: "refl680", label: "680nm", color: "#B22222" },
+    { nm: "730", wavelengthKey: "w730", rawKey: "n730", reflectanceKey: "refl730", label: "730nm", color: "#946565" },
+    { nm: "760", wavelengthKey: "w760", rawKey: "n760", reflectanceKey: "refl760", label: "760nm", color: "#856C6C" },
+    { nm: "810", wavelengthKey: "w810", rawKey: "n810", reflectanceKey: "refl810", label: "810nm", color: "#757272" },
+    { nm: "860", wavelengthKey: "w860", rawKey: "n860", reflectanceKey: "refl860", label: "860nm", color: "#666666" },
   ];
   const wavelengthLookup = Object.fromEntries(wavelengthBands.map((band) => [band.nm, band]));
   const reflectanceMetadataLabel = "Estimated reflectance";
@@ -83,16 +97,50 @@ export default function Data() {
     const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     return `${datePart}, ${timePart}`;
   };
-  const buildEvenlySpacedTicks = (pointCount, maxTicks = 6) => {
-    if (pointCount <= 0) return [];
-    if (pointCount === 1) return [0];
+  const formatMetricValue = (value, digits = 4, suffix = "") => {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return "--";
+    return `${Number(value).toFixed(digits)}${suffix}`;
+  };
+  const getSpectrumRegionLabel = (wavelength) => (Number(wavelength) >= 680 ? "Infrared" : "Visible");
+  const renderSpectrumTooltip = ({ active, payload, measurementUnit = "" }) => {
+    if (!active || !payload?.length) return null;
 
-    const desiredTickCount = Math.min(maxTicks, pointCount);
-    const lastIndex = pointCount - 1;
-    const step = lastIndex / (desiredTickCount - 1);
-    return Array.from({ length: desiredTickCount }, (_, i) =>
-      i === desiredTickCount - 1 ? lastIndex : i * step
+    const point = payload[0]?.payload;
+    if (!point) return null;
+
+    const xValue = Number(point.wavelength);
+    const yValue = Number(point.magnitude);
+
+    return (
+      <div style={{
+        backgroundColor: "white",
+        border: "1px solid #d0d7de",
+        borderRadius: "8px",
+        padding: "10px 12px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+        textAlign: "left"
+      }}>
+        <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "4px" }}>
+          {formatNumberWithCommas(yValue)}{measurementUnit ? ` ${measurementUnit}` : ""}
+        </div>
+        <div style={{ fontSize: "13px", color: "#555" }}>
+          {getSpectrumRegionLabel(xValue)}
+        </div>
+      </div>
     );
+  };
+  const buildSpectrumPoints = (row, measurementKey) => {
+    if (!row) return [];
+
+    return wavelengthBands
+      .map((band) => ({
+        wavelength: toFiniteNumber(row[band.wavelengthKey], Number(band.nm)),
+        magnitude: toFiniteNumber(row[band[measurementKey]], 0),
+        nominalBand: band.label,
+        axisLabel: `${band.label}`,
+        stroke: band.color,
+      }))
+      .sort((a, b) => a.wavelength - b.wavelength);
   };
 
   const availableBatchNumbers = Array.from(
@@ -112,104 +160,47 @@ export default function Data() {
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
   });
 
-  const filteredGraphData = graphData.filter((row) => row.batchNumber === selectedBatchNumber).map((row, index) => ({
-    ...row,
-    chartIndex: index,
-  }));
-  const xAxisTicks = buildEvenlySpacedTicks(filteredGraphData.length, 3);
-  const formatXAxisTick = (value) => {
-    const pointIndex = Math.min(filteredGraphData.length - 1, Math.max(0, Math.round(value)));
-    const point = filteredGraphData[pointIndex];
-    return point ? point.timeLabel : "";
-  };
+  const selectedBatchGraphData = graphData.filter((row) => row.batchNumber === selectedBatchNumber);
+  const clampedTimestampIndex = selectedBatchGraphData.length === 0
+    ? 0
+    : Math.min(selectedTimestampIndex, selectedBatchGraphData.length - 1);
+  const selectedGraphRow = selectedBatchGraphData[clampedTimestampIndex] ?? null;
+  const rawSpectrumData = buildSpectrumPoints(selectedGraphRow, "rawKey");
+  const reflectanceSpectrumData = buildSpectrumPoints(selectedGraphRow, "reflectanceKey");
   const graphConfigurations = [
     {
-      key: "raw_visible",
-      title: "Raw Visible Spectrum",
-      yAxisLabel: "Irradiance (uW/cm²)",
-      lines: [
-        { dataKey: "v450", stroke: "#6A5ACD", name: "450nm" },
-        { dataKey: "b500", stroke: "#00CED1", name: "500nm" },
-        { dataKey: "g550", stroke: "#32CD32", name: "550nm" },
-        { dataKey: "y570", stroke: "#FFD700", name: "570nm" },
-        { dataKey: "o600", stroke: "#FF8C00", name: "600nm" },
-        { dataKey: "n610", stroke: "#CD853F", name: "610nm" },
-        { dataKey: "r650", stroke: "#DC143C", name: "650nm" },
-      ],
+      key: "raw_spectrum",
+      title: "Raw Irradiance Spectrum",
+      subtitle: "Selected timestamp plotted as measurement magnitude versus wavelength.",
+      yAxisLabel: "Measurement Magnitude (uW/cm²)",
+      lineName: "Irradiance",
+      measurementUnit: "uW/cm²",
+      data: rawSpectrumData,
+      stroke: "#1f6feb",
+      chartType: "bar",
     },
     {
-      key: "raw_invisible",
-      title: "Raw Invisible (Near-Infrared) Spectrum",
-      yAxisLabel: "Irradiance (uW/cm²)",
-      lines: [
-        { dataKey: "n680", stroke: "#8B0000", name: "680nm" },
-        { dataKey: "n730", stroke: "#8A2BE2", name: "730nm" },
-        { dataKey: "n760", stroke: "#4B0082", name: "760nm" },
-        { dataKey: "n810", stroke: "#191970", name: "810nm" },
-        { dataKey: "n860", stroke: "#000000", name: "860nm" },
-      ],
-    },
-    {
-      key: "temp",
-      title: "Air and Surface Temperature",
-      yAxisLabel: "Temperature (°C)",
-      lines: [
-        { dataKey: "surface_temp", stroke: "#DC143C", name: "Surface Temp" },
-        { dataKey: "air_temp", stroke: "#1E90FF", name: "Air Temp" },
-      ],
-    },
-    {
-      key: "reflectance",
-      title: "Reflectance",
-      yAxisLabel: "Relative Reflectance",
-      lines: [
-        { dataKey: "refl450", stroke: "#6A5ACD", name: "450nm" },
-        { dataKey: "refl500", stroke: "#00CED1", name: "500nm" },
-        { dataKey: "refl550", stroke: "#32CD32", name: "550nm" },
-        { dataKey: "refl570", stroke: "#FFD700", name: "570nm" },
-        { dataKey: "refl600", stroke: "#FF8C00", name: "600nm" },
-        { dataKey: "refl610", stroke: "#CD853F", name: "610nm" },
-        { dataKey: "refl650", stroke: "#DC143C", name: "650nm" },
-        { dataKey: "refl680", stroke: "#8B0000", name: "680nm" },
-        { dataKey: "refl730", stroke: "#8A2BE2", name: "730nm" },
-        { dataKey: "refl760", stroke: "#4B0082", name: "760nm" },
-        { dataKey: "refl810", stroke: "#191970", name: "810nm" },
-        { dataKey: "refl860", stroke: "#000000", name: "860nm" },
-      ],
-    },
-    {
-      key: "ndvi",
-      title: "NDVI",
-      yAxisLabel: "Index (unitless)",
-      lines: [
-        { dataKey: "ndvi", stroke: "#2E8B57", name: "NDVI" },
-      ],
-    },
-    {
-      key: "sr",
-      title: "SR",
-      yAxisLabel: "Ratio",
-      lines: [
-        { dataKey: "sr", stroke: "#1E90FF", name: "SR" },
-      ],
-    },
-    {
-      key: "dswi4",
-      title: "DSWI 4",
-      yAxisLabel: "Index (unitless)",
-      lines: [
-        { dataKey: "dswi4", stroke: "#A0522D", name: "DSWI 4" },
-      ],
-    },
-    {
-      key: "nirv",
-      title: "NIRv",
-      yAxisLabel: "Index (unitless)",
-      lines: [
-        { dataKey: "nirv", stroke: "#800080", name: "NIRv" },
-      ],
+      key: "reflectance_spectrum",
+      title: "Reflectance Spectrum",
+      subtitle: "Reflectance values derived from the selected timestamp across all wavelengths.",
+      yAxisLabel: "Measurement Magnitude",
+      lineName: "Reflectance",
+      measurementUnit: "",
+      data: reflectanceSpectrumData,
+      stroke: "#2E8B57",
+      chartType: "bar",
     },
   ];
+  const selectedSnapshotCards = selectedGraphRow ? [
+    { label: "Surface Temp", value: formatMetricValue(selectedGraphRow.surface_temp, 2, " °C") },
+    { label: "Air Temp", value: formatMetricValue(selectedGraphRow.air_temp, 2, " °C") },
+    { label: "Humidity", value: formatMetricValue(selectedGraphRow.humidity, 2, " %") },
+    { label: "NDVI", value: formatMetricValue(selectedGraphRow.ndvi) },
+    { label: "SR", value: formatMetricValue(selectedGraphRow.sr) },
+    { label: "DSWI 4", value: formatMetricValue(selectedGraphRow.dswi4) },
+    { label: "NIRv", value: formatMetricValue(selectedGraphRow.nirv) },
+    { label: "RED / NIR", value: `${selectedRedWavelength}nm / ${selectedNirWavelength}nm` },
+  ] : [];
 
   // Retry sending buffered data
   useEffect(() => {
@@ -242,6 +233,21 @@ export default function Data() {
       setSelectedBatchNumber(availableBatchNumbers[0]);
     }
   }, [availableBatchNumbers, selectedBatchNumber]);
+
+  useEffect(() => {
+    setSelectedTimestampIndex(0);
+  }, [selectedBatchNumber, selectedUploadId]);
+
+  useEffect(() => {
+    if (selectedBatchGraphData.length === 0) {
+      if (selectedTimestampIndex !== 0) setSelectedTimestampIndex(0);
+      return;
+    }
+
+    if (selectedTimestampIndex > selectedBatchGraphData.length - 1) {
+      setSelectedTimestampIndex(0);
+    }
+  }, [selectedBatchGraphData.length, selectedTimestampIndex]);
 
   useEffect(() => {
     if (rawUploadRows.length === 0) {
@@ -346,18 +352,18 @@ export default function Data() {
         const date = new Date(row.timestamp_iso8601);
         const rawBatchNumber = row.batch_number ?? row.batch ?? row.batchNumber ?? "";
         const batchNumber = `${rawBatchNumber}`.trim() || "Unspecified";
-        const v450 = parseFloat(row.irradiance_450nm_blue_irradiance_uw_per_cm_squared) || 0;
-        const b500 = parseFloat(row.irradiance_500nm_cyan_irradiance_uw_per_cm_squared) || 0;
-        const g550 = parseFloat(row.irradiance_550nm_green_irradiance_uw_per_cm_squared) || 0;
-        const y570 = parseFloat(row.irradiance_570nm_yellow_irradiance_uw_per_cm_squared) || 0;
-        const o600 = parseFloat(row.irradiance_600nm_orange_irradiance_uw_per_cm_squared) || 0;
-        const n610 = parseFloat(row.irradiance_610nm_orange_irradiance_uw_per_cm_squared) || 0;
-        const r650 = parseFloat(row.irradiance_650nm_red_irradiance_uw_per_cm_squared) || 0;
-        const n680 = parseFloat(row.irradiance_680nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
-        const n730 = parseFloat(row.irradiance_730nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
-        const n760 = parseFloat(row.irradiance_760nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
-        const n810 = parseFloat(row.irradiance_810nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
-        const n860 = parseFloat(row.irradiance_860nm_near_infrared_irradiance_uw_per_cm_squared) || 0;
+        const v450 = parseOptionalNumber(row.irradiance_450nm_blue_irradiance_uw_per_cm_squared);
+        const b500 = parseOptionalNumber(row.irradiance_500nm_cyan_irradiance_uw_per_cm_squared);
+        const g550 = parseOptionalNumber(row.irradiance_550nm_green_irradiance_uw_per_cm_squared);
+        const y570 = parseOptionalNumber(row.irradiance_570nm_yellow_irradiance_uw_per_cm_squared);
+        const o600 = parseOptionalNumber(row.irradiance_600nm_orange_irradiance_uw_per_cm_squared);
+        const n610 = parseOptionalNumber(row.irradiance_610nm_orange_irradiance_uw_per_cm_squared);
+        const r650 = parseOptionalNumber(row.irradiance_650nm_red_irradiance_uw_per_cm_squared);
+        const n680 = parseOptionalNumber(row.irradiance_680nm_near_infrared_irradiance_uw_per_cm_squared);
+        const n730 = parseOptionalNumber(row.irradiance_730nm_near_infrared_irradiance_uw_per_cm_squared);
+        const n760 = parseOptionalNumber(row.irradiance_760nm_near_infrared_irradiance_uw_per_cm_squared);
+        const n810 = parseOptionalNumber(row.irradiance_810nm_near_infrared_irradiance_uw_per_cm_squared);
+        const n860 = parseOptionalNumber(row.irradiance_860nm_near_infrared_irradiance_uw_per_cm_squared);
 
         return {
           id: index,
@@ -367,9 +373,22 @@ export default function Data() {
           note: row.note || "",
           timeLabel: formatTimeLabel(date),
           // Temperature (try both uppercase and lowercase column names from postgres)
-          surface_temp: parseFloat(row.surface_temperature_c || row.surface_temperature_C) || 0,
-          air_temp: parseFloat(row.air_temperature_c || row.air_temperature_C) || 0,
-          humidity: parseFloat(row.relative_humidity_percent) || 0,
+          surface_temp: parseOptionalNumber(row.surface_temperature_c ?? row.surface_temperature_C),
+          air_temp: parseOptionalNumber(row.air_temperature_c ?? row.air_temperature_C),
+          humidity: parseOptionalNumber(row.relative_humidity_percent),
+          // Calibrated wavelength per band
+          w450: parseOptionalNumber(row.irradiance_450nm_blue_wavelength_nm),
+          w500: parseOptionalNumber(row.irradiance_500nm_cyan_wavelength_nm),
+          w550: parseOptionalNumber(row.irradiance_550nm_green_wavelength_nm),
+          w570: parseOptionalNumber(row.irradiance_570nm_yellow_wavelength_nm),
+          w600: parseOptionalNumber(row.irradiance_600nm_orange_wavelength_nm),
+          w610: parseOptionalNumber(row.irradiance_610nm_orange_wavelength_nm),
+          w650: parseOptionalNumber(row.irradiance_650nm_red_wavelength_nm),
+          w680: parseOptionalNumber(row.irradiance_680nm_near_infrared_wavelength_nm),
+          w730: parseOptionalNumber(row.irradiance_730nm_near_infrared_wavelength_nm),
+          w760: parseOptionalNumber(row.irradiance_760nm_near_infrared_wavelength_nm),
+          w810: parseOptionalNumber(row.irradiance_810nm_near_infrared_wavelength_nm),
+          w860: parseOptionalNumber(row.irradiance_860nm_near_infrared_wavelength_nm),
           // Raw irradiance
           v450,
           b500,
@@ -1030,86 +1049,202 @@ export default function Data() {
               </div>
 
               {loadingGraph ? <p>Loading data...</p> : (
-                filteredGraphData.length === 0 ? <p>No data points found for this batch.</p> : (
+                selectedBatchGraphData.length === 0 ? <p>No data points found for this batch.</p> : (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(640px, 2.5fr))", gap: "30px" }}>
+                    <div style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "14px",
+                      marginBottom: "22px",
+                      padding: "14px",
+                      border: "1px solid #d0d7de",
+                      borderRadius: "10px",
+                      backgroundColor: "#f8fafc"
+                    }}>
+                      <div style={{ textAlign: "left" }}>
+                        <div style={{ fontSize: "13px", color: "#555", marginBottom: "4px" }}>Selected timestamp</div>
+                        <div style={{ fontSize: "20px", fontWeight: 700 }}>{selectedGraphRow?.timeLabel || "--"}</div>
+                        <div style={{ fontSize: "13px", color: "#555", marginTop: "4px" }}>
+                          Snapshot {clampedTimestampIndex + 1} of {selectedBatchGraphData.length}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => setSelectedTimestampIndex((prev) => Math.max(prev - 1, 0))}
+                          disabled={clampedTimestampIndex === 0}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            cursor: clampedTimestampIndex === 0 ? "default" : "pointer",
+                            backgroundColor: clampedTimestampIndex === 0 ? "#f3f4f6" : "white"
+                          }}
+                        >
+                          Previous
+                        </button>
+
+                        <label htmlFor="timestamp-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                          Timestamp
+                        </label>
+                        <select
+                          id="timestamp-filter"
+                          value={clampedTimestampIndex}
+                          onChange={(e) => setSelectedTimestampIndex(Number(e.target.value))}
+                          style={{
+                            minWidth: "220px",
+                            padding: "6px 10px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            backgroundColor: "white",
+                            cursor: "pointer"
+                          }}
+                        >
+                          {selectedBatchGraphData.map((row, index) => (
+                            <option key={`${row.dataPointId}-${row.timestamp}`} value={index}>
+                              {`${index + 1}. ${row.timeLabel}`}
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          onClick={() => setSelectedTimestampIndex((prev) => Math.min(prev + 1, selectedBatchGraphData.length - 1))}
+                          disabled={clampedTimestampIndex === selectedBatchGraphData.length - 1}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            cursor: clampedTimestampIndex === selectedBatchGraphData.length - 1 ? "default" : "pointer",
+                            backgroundColor: clampedTimestampIndex === selectedBatchGraphData.length - 1 ? "#f3f4f6" : "white"
+                          }}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "30px" }}>
                       {graphConfigurations.map((config) => (
                         <div key={config.key} style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 16px 0", fontWeight: 700 }}>{config.title}</h4>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "center", marginBottom: "10px" }}>
-                            {config.lines.map((line) => (
-                              <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
-                                <span style={{ width: "16px", height: "2px", backgroundColor: line.stroke, display: "inline-block" }} />
-                                <span>{line.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div style={{ width: '100%', height: 605 }}>
+                          <h4 style={{ margin: "0 0 6px 0", fontWeight: 700 }}>{config.title}</h4>
+                          <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "#555", textAlign: "left" }}>
+                            {config.subtitle}
+                          </p>
+                          <div style={{ width: '100%', height: 430 }}>
                             <ResponsiveContainer>
-                              <LineChart data={filteredGraphData} margin={{ top: 10, right: 55, left: 30, bottom: 30 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis 
-                                  dataKey="chartIndex"
-                                  type="number"
-                                  domain={[0, Math.max(filteredGraphData.length - 1, 0)]}
-                                  ticks={xAxisTicks}
-                                  tickFormatter={formatXAxisTick}
-                                  allowDecimals={false}
-                                  interval={0}
-                                  height={65}
-                                  tickMargin={14}
-                                  padding={{ left: 0, right: 0 }}
-                                  tick={{ fontWeight: 700, fill: '#000', fontSize: 12 }}
-                                  axisLine={{ stroke: '#000' }}
-                                  tickLine={{ stroke: '#000' }}
-                                />
-                                <YAxis
-                                  domain={['auto', 'auto']}
-                                  width={90}
-                                  tick={{ fontWeight: 700, fill: '#000' }}
-                                  axisLine={{ stroke: '#000' }}
-                                  tickLine={{ stroke: '#000' }}
-                                  label={{
-                                    value: config.yAxisLabel,
-                                    angle: -90,
-                                    position: 'left',
-                                    offset: 18,
-                                    style: { textAnchor: 'middle', fontWeight: 700, fill: '#000' }
-                                  }}
-                                />
-                                <Tooltip 
-                                  formatter={(value, name) => {
-                                    if (typeof value === 'number') {
-                                      return [value.toFixed(4), name];
-                                    }
-                                    return [value, name];
-                                  }}
-                                  labelFormatter={(label) => {
-                                    if (typeof label === 'string') return `Time: ${label}`;
-                                    const pointIndex = Math.round(Number(label));
-                                    const point = filteredGraphData[pointIndex];
-                                    if (!point) return `Time: ${label}`;
-                                    const metadata = point.calculationMetadata;
-                                    return `Time: ${point.timeLabel} | RED ${metadata.redWavelength}nm | NIR ${metadata.nirWavelength}nm`;
-                                  }}
-                                />
-                                {config.lines.map((line) => (
-                                  <Line
-                                    key={line.dataKey}
-                                    type="monotone"
-                                    dataKey={line.dataKey}
-                                    stroke={line.stroke}
-                                    dot={pointDotStyle}
-                                    activeDot={activePointDotStyle}
-                                    strokeWidth={2}
-                                    name={line.name}
+                              {config.chartType === "bar" ? (
+                                <BarChart data={config.data} margin={{ top: 10, right: 30, left: 20, bottom: 30 }} barSize={36}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis
+                                    dataKey="axisLabel"
+                                    type="category"
+                                    interval={0}
+                                    tick={{ fontWeight: 700, fill: '#000', fontSize: 12 }}
+                                    axisLine={{ stroke: '#000' }}
+                                    tickLine={{ stroke: '#000' }}
+                                    label={{
+                                      value: 'Wavelength (nm)',
+                                      position: 'insideBottom',
+                                      offset: -14,
+                                      style: { fontWeight: 700, fill: '#000' }
+                                    }}
                                   />
-                                ))}
-                              </LineChart>
+                                  <YAxis
+                                    domain={['auto', 'auto']}
+                                    width={95}
+                                    tickFormatter={(value) => formatNumberWithCommas(value, 2)}
+                                    tick={{ fontWeight: 700, fill: '#000' }}
+                                    axisLine={{ stroke: '#000' }}
+                                    tickLine={{ stroke: '#000' }}
+                                    label={{
+                                      value: config.yAxisLabel,
+                                      angle: -90,
+                                      position: 'left',
+                                      offset: 10,
+                                      style: { textAnchor: 'middle', fontWeight: 700, fill: '#000' }
+                                    }}
+                                  />
+                                  <Tooltip content={(tooltipProps) => renderSpectrumTooltip({ ...tooltipProps, measurementUnit: config.measurementUnit })} />
+                                  <Bar dataKey="magnitude" name={config.lineName} radius={[0, 0, 0, 0]}>
+                                    {config.data.map((entry) => (
+                                      <Cell key={`${config.key}-${entry.nominalBand}`} fill={entry.stroke} stroke={entry.stroke} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              ) : (
+                                <LineChart data={config.data} margin={{ top: 10, right: 30, left: 20, bottom: 30 }}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis
+                                    dataKey="wavelength"
+                                    type="number"
+                                    domain={['auto', 'auto']}
+                                    tickFormatter={(value) => `${Math.round(value)}`}
+                                    tick={{ fontWeight: 700, fill: '#000', fontSize: 12 }}
+                                    axisLine={{ stroke: '#000' }}
+                                    tickLine={{ stroke: '#000' }}
+                                    label={{
+                                      value: 'Wavelength (nm)',
+                                      position: 'insideBottom',
+                                      offset: -14,
+                                      style: { fontWeight: 700, fill: '#000' }
+                                    }}
+                                  />
+                                  <YAxis
+                                    domain={['auto', 'auto']}
+                                    width={95}
+                                    tickFormatter={(value) => formatNumberWithCommas(value, 2)}
+                                    tick={{ fontWeight: 700, fill: '#000' }}
+                                    axisLine={{ stroke: '#000' }}
+                                    tickLine={{ stroke: '#000' }}
+                                    label={{
+                                      value: config.yAxisLabel,
+                                      angle: -90,
+                                      position: 'left',
+                                      offset: 10,
+                                      style: { textAnchor: 'middle', fontWeight: 700, fill: '#000' }
+                                    }}
+                                  />
+                                  <Tooltip content={(tooltipProps) => renderSpectrumTooltip({ ...tooltipProps, measurementUnit: config.measurementUnit })} />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="magnitude"
+                                    stroke={config.stroke}
+                                    dot={{ ...pointDotStyle, fill: config.stroke, stroke: config.stroke }}
+                                    activeDot={{ ...activePointDotStyle, fill: config.stroke, stroke: config.stroke }}
+                                    strokeWidth={2.5}
+                                    name={config.lineName}
+                                  />
+                                </LineChart>
+                              )}
                             </ResponsiveContainer>
                           </div>
                         </div>
                       ))}
+                    </div>
+
+                    <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
+                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Selected Timestamp Summary</h4>
+                      <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "#555" }}>
+                        Non-spectral values are shown here for the currently selected timestamp, while the charts stay wavelength-based.
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
+                        {selectedSnapshotCards.map((card) => (
+                          <div
+                            key={card.label}
+                            style={{
+                              border: "1px solid #d0d7de",
+                              borderRadius: "8px",
+                              padding: "12px",
+                              backgroundColor: "#f8fafc"
+                            }}
+                          >
+                            <div style={{ fontSize: "12px", color: "#555", marginBottom: "6px" }}>{card.label}</div>
+                            <div style={{ fontSize: "18px", fontWeight: 700 }}>{card.value}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
