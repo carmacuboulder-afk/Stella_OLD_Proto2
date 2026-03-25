@@ -10,6 +10,9 @@ import teamMembersRouter from './routes/teamMembers.js';
 import devicesRouter from './routes/devices.js';
 import uploadsRouter from './routes/uploads.js';
 import dataRouter from './routes/data.js';
+import authRouter from './routes/auth.js';
+import externalRouter from './routes/external.js';
+import evaRouter from './routes/eva.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -44,6 +47,9 @@ app.use('/api/team-members', teamMembersRouter);
 app.use('/api/devices', devicesRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/data', dataRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/external', externalRouter);
+app.use('/api/eva', evaRouter);
 
 app.use((req, res, next) => {
   res.status(404).json({ error: 'Not found' });
