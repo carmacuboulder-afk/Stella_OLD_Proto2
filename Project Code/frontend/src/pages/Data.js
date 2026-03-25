@@ -93,9 +93,23 @@ export default function Data() {
   const wavelengthLookup = Object.fromEntries(wavelengthBands.map((band) => [band.nm, band]));
   const reflectanceMetadataLabel = "Estimated reflectance";
   const formatTimeLabel = (date) => {
-    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    return `${datePart}, ${timePart}`;
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+  const buildEvenlySpacedTicks = (pointCount, maxTicks = 6) => {
+    if (pointCount <= 0) return [];
+    if (pointCount === 1) return [0];
+
+    const desiredTickCount = Math.min(maxTicks, pointCount);
+    const lastIndex = pointCount - 1;
+    const step = lastIndex / (desiredTickCount - 1);
+
+    return Array.from({ length: desiredTickCount }, (_, index) =>
+      index === desiredTickCount - 1 ? lastIndex : index * step
+    );
   };
   const formatMetricValue = (value, digits = 4, suffix = "") => {
     if (value === null || value === undefined || !Number.isFinite(Number(value))) return "--";
@@ -161,10 +175,17 @@ export default function Data() {
   });
 
   const selectedBatchGraphData = graphData.filter((row) => row.batchNumber === selectedBatchNumber);
+  const selectedBatchTimeSeriesData = selectedBatchGraphData.map((row, index) => ({
+    ...row,
+    chartIndex: index,
+  }));
   const clampedTimestampIndex = selectedBatchGraphData.length === 0
     ? 0
     : Math.min(selectedTimestampIndex, selectedBatchGraphData.length - 1);
   const selectedGraphRow = selectedBatchGraphData[clampedTimestampIndex] ?? null;
+  const timeAxisTicks = buildEvenlySpacedTicks(selectedBatchTimeSeriesData.length, 4);
+  const firstTimeAxisTick = timeAxisTicks[0];
+  const lastTimeAxisTick = timeAxisTicks[timeAxisTicks.length - 1];
   const rawSpectrumData = buildSpectrumPoints(selectedGraphRow, "rawKey");
   const reflectanceSpectrumData = buildSpectrumPoints(selectedGraphRow, "reflectanceKey");
   const graphConfigurations = [
@@ -201,6 +222,69 @@ export default function Data() {
     { label: "NIRv", value: formatMetricValue(selectedGraphRow.nirv) },
     { label: "RED / NIR", value: `${selectedRedWavelength}nm / ${selectedNirWavelength}nm` },
   ] : [];
+  const timeSeriesGraphConfigurations = [
+    {
+      key: "raw_visible_over_time",
+      title: "Raw Visible Spectrum Over Time",
+      subtitle: "Batch measurements across visible wavelengths over time.",
+      yAxisLabel: "Measurement Magnitude (uW/cm²)",
+      lines: [
+        { dataKey: "v450", stroke: "#6A5ACD", name: "450nm" },
+        { dataKey: "b500", stroke: "#00CED1", name: "500nm" },
+        { dataKey: "g550", stroke: "#32CD32", name: "550nm" },
+        { dataKey: "y570", stroke: "#FFD700", name: "570nm" },
+        { dataKey: "o600", stroke: "#FF8C00", name: "600nm" },
+        { dataKey: "n610", stroke: "#CD853F", name: "610nm" },
+        { dataKey: "r650", stroke: "#DC143C", name: "650nm" },
+      ],
+    },
+    {
+      key: "raw_infrared_over_time",
+      title: "Raw Infrared Spectrum Over Time",
+      subtitle: "Batch measurements across infrared wavelengths over time.",
+      yAxisLabel: "Measurement Magnitude (uW/cm²)",
+      lines: [
+        { dataKey: "n680", stroke: "#B22222", name: "680nm" },
+        { dataKey: "n730", stroke: "#946565", name: "730nm" },
+        { dataKey: "n760", stroke: "#856C6C", name: "760nm" },
+        { dataKey: "n810", stroke: "#757272", name: "810nm" },
+        { dataKey: "n860", stroke: "#666666", name: "860nm" },
+      ],
+    },
+    {
+      key: "reflectance_over_time",
+      title: "Reflectance Over Time",
+      subtitle: "Batch reflectance values across all wavelengths over time.",
+      yAxisLabel: "Measurement Magnitude",
+      lines: wavelengthBands.map((band) => ({
+        dataKey: band.reflectanceKey,
+        stroke: band.color,
+        name: band.label,
+      })),
+    },
+    {
+      key: "temperature_over_time",
+      title: "Temperature Over Time",
+      subtitle: "Air and surface temperature for the selected batch over time.",
+      yAxisLabel: "Temperature (°C)",
+      lines: [
+        { dataKey: "surface_temp", stroke: "#DC143C", name: "Surface Temp" },
+        { dataKey: "air_temp", stroke: "#1E90FF", name: "Air Temp" },
+      ],
+    },
+    {
+      key: "indices_over_time",
+      title: "Vegetation Indices Over Time",
+      subtitle: "NDVI, SR, DSWI 4, and NIRv for the selected batch over time.",
+      yAxisLabel: "Index Value",
+      lines: [
+        { dataKey: "ndvi", stroke: "#2E8B57", name: "NDVI" },
+        { dataKey: "sr", stroke: "#1E90FF", name: "SR" },
+        { dataKey: "dswi4", stroke: "#A0522D", name: "DSWI 4" },
+        { dataKey: "nirv", stroke: "#800080", name: "NIRv" },
+      ],
+    },
+  ];
 
   // Retry sending buffered data
   useEffect(() => {
@@ -1128,10 +1212,7 @@ export default function Data() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "30px" }}>
                       {graphConfigurations.map((config) => (
                         <div key={config.key} style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 6px 0", fontWeight: 700 }}>{config.title}</h4>
-                          <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "#555", textAlign: "left" }}>
-                            {config.subtitle}
-                          </p>
+                          <h4 style={{ margin: "0 0 14px 0", fontWeight: 700, fontSize: "20px", textAlign: "center" }}>{config.title}</h4>
                           <div style={{ width: '100%', height: 430 }}>
                             <ResponsiveContainer>
                               {config.chartType === "bar" ? (
@@ -1242,6 +1323,107 @@ export default function Data() {
                           >
                             <div style={{ fontSize: "12px", color: "#555", marginBottom: "6px" }}>{card.label}</div>
                             <div style={{ fontSize: "18px", fontWeight: 700 }}>{card.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
+                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Selected Batch Over Time</h4>
+                      <p style={{ margin: "0 0 18px 0", fontSize: "13px", color: "#555" }}>
+                        These charts show how the currently selected batch changes across timestamps, while the spectrum view above stays focused on one selected snapshot.
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px" }}>
+                        {timeSeriesGraphConfigurations.map((config) => (
+                          <div key={config.key} style={{ border: "1px solid #d0d7de", borderRadius: "10px", padding: "14px", backgroundColor: "#fff" }}>
+                            <h5 style={{ margin: "0 0 10px 0", fontWeight: 700, fontSize: "20px", textAlign: "center" }}>{config.title}</h5>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", justifyContent: "center", marginBottom: "10px" }}>
+                              {config.lines.map((line) => (
+                                <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+                                  <span style={{ width: "16px", height: "2px", backgroundColor: line.stroke, display: "inline-block" }} />
+                                  <span>{line.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ width: "100%", height: 340 }}>
+                              <ResponsiveContainer>
+                                <LineChart data={selectedBatchTimeSeriesData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis
+                                    dataKey="chartIndex"
+                                    type="number"
+                                    domain={[0, Math.max(selectedBatchTimeSeriesData.length - 1, 0)]}
+                                    ticks={timeAxisTicks}
+                                    allowDecimals={false}
+                                    interval={0}
+                                    tickMargin={12}
+                                    tick={({ x, y, payload }) => {
+                                      const pointIndex = Math.round(Number(payload.value));
+                                      const timeLabel = selectedBatchTimeSeriesData[pointIndex]?.timeLabel || "";
+                                      const isFirstTick = payload.value === firstTimeAxisTick;
+                                      const isLastTick = payload.value === lastTimeAxisTick;
+
+                                      return (
+                                        <text
+                                          x={x + (isFirstTick ? 12 : isLastTick ? -12 : 0)}
+                                          y={y}
+                                          dy={16}
+                                          textAnchor={isFirstTick ? "start" : isLastTick ? "end" : "middle"}
+                                          fill="#000"
+                                          fontWeight={700}
+                                          fontSize={13}
+                                        >
+                                          {timeLabel}
+                                        </text>
+                                      );
+                                    }}
+                                    axisLine={{ stroke: '#000' }}
+                                    tickLine={{ stroke: '#000' }}
+                                    label={{
+                                      value: 'Time',
+                                      position: 'insideBottom',
+                                      offset: -14,
+                                      style: { fontWeight: 700, fill: '#000' }
+                                    }}
+                                  />
+                                  <YAxis
+                                    domain={['auto', 'auto']}
+                                    width={95}
+                                    tickFormatter={(value) => formatNumberWithCommas(value, 2)}
+                                    tick={{ fontWeight: 700, fill: '#000' }}
+                                    axisLine={{ stroke: '#000' }}
+                                    tickLine={{ stroke: '#000' }}
+                                    label={{
+                                      value: config.yAxisLabel,
+                                      angle: -90,
+                                      position: 'left',
+                                      offset: 10,
+                                      style: { textAnchor: 'middle', fontWeight: 700, fill: '#000' }
+                                    }}
+                                  />
+                                  <Tooltip
+                                    formatter={(value, name) => [formatNumberWithCommas(value), name]}
+                                    labelFormatter={(value) => {
+                                      const pointIndex = Math.round(Number(value));
+                                      const point = selectedBatchTimeSeriesData[pointIndex];
+                                      return point ? `Time: ${point.timeLabel}` : `Time: ${value}`;
+                                    }}
+                                  />
+                                  {config.lines.map((line) => (
+                                    <Line
+                                      key={`${config.key}-${line.dataKey}`}
+                                      type="monotone"
+                                      dataKey={line.dataKey}
+                                      stroke={line.stroke}
+                                      dot={pointDotStyle}
+                                      activeDot={activePointDotStyle}
+                                      strokeWidth={2}
+                                      name={line.name}
+                                    />
+                                  ))}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
                           </div>
                         ))}
                       </div>
