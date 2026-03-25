@@ -2,7 +2,7 @@
 .register-container {
   text-align: center; 
   max-width: fit-content; 
-  margin: 30px auto 0;
+  margin: 30px auto 30px;
   padding: 40px 120px 56px;
   border-radius: 12px;
   box-shadow: 0 8px 20px rgba(0,0,0,0.06);
