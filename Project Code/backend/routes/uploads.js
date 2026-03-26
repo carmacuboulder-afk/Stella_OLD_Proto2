@@ -32,6 +32,43 @@ const formatTimestamp = (raw) => {
   return new Date().toISOString();
 };
 
+const formatBatchDate = (rawTimestamp) => formatTimestamp(rawTimestamp).slice(0, 10);
+
+const summarizeBatchDateWarnings = (rows) => {
+  const batchDates = new Map();
+
+  rows.forEach((row) => {
+    const timestamp = row.timestamp_iso8601?.trim();
+    const batchNumber = parseBatch(row.batch_number ?? row.batch);
+
+    if (!timestamp || !batchNumber) return;
+
+    if (!batchDates.has(batchNumber)) {
+      batchDates.set(batchNumber, new Set());
+    }
+
+    batchDates.get(batchNumber).add(formatBatchDate(timestamp));
+  });
+
+  return Array.from(batchDates.entries())
+    .filter(([, dates]) => dates.size > 1)
+    .sort(([batchA], [batchB]) => {
+      const aNum = Number(batchA);
+      const bNum = Number(batchB);
+      const aIsNumeric = Number.isFinite(aNum);
+      const bIsNumeric = Number.isFinite(bNum);
+
+      if (aIsNumeric && bIsNumeric) return aNum - bNum;
+      if (aIsNumeric) return -1;
+      if (bIsNumeric) return 1;
+      return batchA.localeCompare(batchB, undefined, { numeric: true, sensitivity: 'base' });
+    })
+    .map(([batchNumber, dates]) => ({
+      batchNumber,
+      dates: Array.from(dates).sort(),
+    }));
+};
+
 // GET /api/uploads
 router.get('/', async (req, res, next) => {
   try {
@@ -61,6 +98,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
         const firstRow = results[0];
         const deviceType = firstRow.device_type;
         const fileTimestamp = formatTimestamp(firstRow.timestamp_iso8601);
+        const batchWarnings = summarizeBatchDateWarnings(results);
         
         await client.query('BEGIN');
 
@@ -201,7 +239,11 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
         }
 
         await client.query('COMMIT');
-        res.status(201).json({ message: 'Upload success', rows: results.length });
+        res.status(201).json({
+          message: 'Upload success',
+          rows: results.length,
+          batchWarnings,
+        });
 
       } catch (err) {
         await client.query('ROLLBACK');
@@ -380,11 +422,15 @@ router.post('/live/end', async (req, res, next) => {
 router.get('/:id/data', async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT d.*, COALESCE(bn.note, '') AS note
+      `SELECT
+         d.*,
+         (d.timestamp_iso8601 AT TIME ZONE 'UTC')::date AS batch_date,
+         COALESCE(bn.note, '') AS note
        FROM data d
        LEFT JOIN batch_notes bn
          ON bn.upload_id = d.upload_id
         AND bn.batch_number = COALESCE(NULLIF(BTRIM(d.batch_number), ''), '')
+        AND bn.batch_date = (d.timestamp_iso8601 AT TIME ZONE 'UTC')::date
        WHERE d.upload_id = $1
        ORDER BY d.timestamp_iso8601 ASC`,
       [req.params.id]

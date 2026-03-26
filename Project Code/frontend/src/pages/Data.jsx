@@ -14,10 +14,11 @@ export default function Data() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [batchNoteDrafts, setBatchNoteDrafts] = useState({});
   const [batchNoteSaveStatus, setBatchNoteSaveStatus] = useState({});
-  const [savingBatchNumber, setSavingBatchNumber] = useState(null);
+  const [savingBatchKey, setSavingBatchKey] = useState(null);
 
-  const [selectedBatchNumber, setSelectedBatchNumber] = useState("");
+  const [selectedBatchKey, setSelectedBatchKey] = useState("");
   const [selectedTimestampIndex, setSelectedTimestampIndex] = useState(0);
+  const [isTimestampPlaying, setIsTimestampPlaying] = useState(false);
   const [selectedRedWavelength, setSelectedRedWavelength] = useState("680");
   const [selectedNirWavelength, setSelectedNirWavelength] = useState("810");
 
@@ -99,6 +100,12 @@ export default function Data() {
       second: '2-digit',
     });
   };
+  const buildBatchKey = (batchNumber, batchDate) => `${batchNumber}::${batchDate}`;
+  const buildBatchLabel = (batchNumber, batchDate) => (
+    batchNumber === "Unspecified"
+      ? `Unspecified - ${batchDate}`
+      : `Batch ${batchNumber} - ${batchDate}`
+  );
   const buildEvenlySpacedTicks = (pointCount, maxTicks = 6) => {
     if (pointCount <= 0) return [];
     if (pointCount === 1) return [0];
@@ -157,28 +164,46 @@ export default function Data() {
       .sort((a, b) => a.wavelength - b.wavelength);
   };
 
-  const availableBatchNumbers = Array.from(
-    new Set(graphData.map((row) => row.batchNumber).filter(Boolean))
-  ).sort((a, b) => {
-    if (a === "Unspecified") return 1;
-    if (b === "Unspecified") return -1;
+  const availableBatches = Array.from(
+    graphData.reduce((batches, row) => {
+      if (!row.batchKey || batches.has(row.batchKey)) return batches;
 
-    const aNum = Number(a);
-    const bNum = Number(b);
+      batches.set(row.batchKey, {
+        key: row.batchKey,
+        batchNumber: row.batchNumber,
+        batchDate: row.batchDate,
+        label: row.batchLabel,
+      });
+
+      return batches;
+    }, new Map()).values()
+  ).sort((a, b) => {
+    if (a.batchNumber === "Unspecified") return 1;
+    if (b.batchNumber === "Unspecified") return -1;
+
+    const aNum = Number(a.batchNumber);
+    const bNum = Number(b.batchNumber);
     const aIsNumeric = Number.isFinite(aNum);
     const bIsNumeric = Number.isFinite(bNum);
 
-    if (aIsNumeric && bIsNumeric) return aNum - bNum;
-    if (aIsNumeric) return -1;
-    if (bIsNumeric) return 1;
-    return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    if (aIsNumeric && bIsNumeric && aNum !== bNum) return aNum - bNum;
+    if (aIsNumeric && !bIsNumeric) return -1;
+    if (!aIsNumeric && bIsNumeric) return 1;
+
+    const batchCompare = a.batchNumber.localeCompare(b.batchNumber, undefined, { numeric: true, sensitivity: "base" });
+    if (batchCompare !== 0) return batchCompare;
+
+    return a.batchDate.localeCompare(b.batchDate);
   });
 
-  const selectedBatchGraphData = graphData.filter((row) => row.batchNumber === selectedBatchNumber);
+  const selectedBatchOption = availableBatches.find((batch) => batch.key === selectedBatchKey) ?? null;
+  const selectedBatchLabel = selectedBatchOption?.label ?? "";
+  const selectedBatchGraphData = graphData.filter((row) => row.batchKey === selectedBatchKey);
   const selectedBatchTimeSeriesData = selectedBatchGraphData.map((row, index) => ({
     ...row,
     chartIndex: index,
   }));
+  const canPlayTimestamps = selectedBatchGraphData.length > 1;
   const clampedTimestampIndex = selectedBatchGraphData.length === 0
     ? 0
     : Math.min(selectedTimestampIndex, selectedBatchGraphData.length - 1);
@@ -308,19 +333,20 @@ export default function Data() {
   }, []);
 
   useEffect(() => {
-    if (availableBatchNumbers.length === 0) {
-      if (selectedBatchNumber !== "") setSelectedBatchNumber("");
+    if (availableBatches.length === 0) {
+      if (selectedBatchKey !== "") setSelectedBatchKey("");
       return;
     }
 
-    if (!availableBatchNumbers.includes(selectedBatchNumber)) {
-      setSelectedBatchNumber(availableBatchNumbers[0]);
+    if (!availableBatches.some((batch) => batch.key === selectedBatchKey)) {
+      setSelectedBatchKey(availableBatches[0].key);
     }
-  }, [availableBatchNumbers, selectedBatchNumber]);
+  }, [availableBatches, selectedBatchKey]);
 
   useEffect(() => {
     setSelectedTimestampIndex(0);
-  }, [selectedBatchNumber, selectedUploadId]);
+    setIsTimestampPlaying(false);
+  }, [selectedBatchKey, selectedUploadId]);
 
   useEffect(() => {
     if (selectedBatchGraphData.length === 0) {
@@ -332,6 +358,23 @@ export default function Data() {
       setSelectedTimestampIndex(0);
     }
   }, [selectedBatchGraphData.length, selectedTimestampIndex]);
+
+  useEffect(() => {
+    if (canPlayTimestamps || !isTimestampPlaying) return;
+    setIsTimestampPlaying(false);
+  }, [canPlayTimestamps, isTimestampPlaying]);
+
+  useEffect(() => {
+    if (!isTimestampPlaying || !canPlayTimestamps) return;
+
+    const intervalId = window.setInterval(() => {
+      setSelectedTimestampIndex((prev) => (
+        prev >= selectedBatchGraphData.length - 1 ? 0 : prev + 1
+      ));
+    }, 1500);
+
+    return () => window.clearInterval(intervalId);
+  }, [isTimestampPlaying, canPlayTimestamps, selectedBatchGraphData.length]);
 
   useEffect(() => {
     if (rawUploadRows.length === 0) {
@@ -398,10 +441,10 @@ export default function Data() {
     setBatchNoteDrafts((previous) => {
       const nextDrafts = { ...previous };
       formatted.forEach((row) => {
-        if (!(row.batchNumber in nextDrafts)) {
-          nextDrafts[row.batchNumber] = previous[row.batchNumber] ?? row.note ?? "";
-        } else if (!nextDrafts[row.batchNumber] && row.note) {
-          nextDrafts[row.batchNumber] = row.note;
+        if (!(row.batchKey in nextDrafts)) {
+          nextDrafts[row.batchKey] = previous[row.batchKey] ?? row.note ?? "";
+        } else if (!nextDrafts[row.batchKey] && row.note) {
+          nextDrafts[row.batchKey] = row.note;
         }
       });
       return nextDrafts;
@@ -420,10 +463,11 @@ export default function Data() {
 
   const handleSelectUpload = async (uploadId) => {
     setSelectedUploadId(uploadId);
-    setSelectedBatchNumber("");
+    setSelectedBatchKey("");
     setRawUploadRows([]);
     setBatchNoteDrafts({});
     setBatchNoteSaveStatus({});
+    setSavingBatchKey(null);
     setLoadingGraph(true);
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/${uploadId}/data`);
@@ -436,6 +480,8 @@ export default function Data() {
         const date = new Date(row.timestamp_iso8601);
         const rawBatchNumber = row.batch_number ?? row.batch ?? row.batchNumber ?? "";
         const batchNumber = `${rawBatchNumber}`.trim() || "Unspecified";
+        const batchDate = `${row.batch_date ?? date.toISOString().slice(0, 10)}`.trim();
+        const batchKey = buildBatchKey(batchNumber, batchDate);
         const v450 = parseOptionalNumber(row.irradiance_450nm_blue_irradiance_uw_per_cm_squared);
         const b500 = parseOptionalNumber(row.irradiance_500nm_cyan_irradiance_uw_per_cm_squared);
         const g550 = parseOptionalNumber(row.irradiance_550nm_green_irradiance_uw_per_cm_squared);
@@ -454,6 +500,9 @@ export default function Data() {
           dataPointId: row.id,
           timestamp: row.timestamp_iso8601,
           batchNumber,
+          batchDate,
+          batchKey,
+          batchLabel: buildBatchLabel(batchNumber, batchDate),
           note: row.note || "",
           timeLabel: formatTimeLabel(date),
           // Temperature (try both uppercase and lowercase column names from postgres)
@@ -497,18 +546,18 @@ export default function Data() {
     }
   };
 
-  const handleBatchNoteDraftChange = (batchNumber, value) => {
+  const handleBatchNoteDraftChange = (batchKey, value) => {
     setBatchNoteDrafts((prev) => ({
       ...prev,
-      [batchNumber]: value,
+      [batchKey]: value,
     }));
   };
 
   const handleSaveBatchNote = async () => {
-    if (!selectedUploadId || !selectedBatchNumber) return;
-    const note = batchNoteDrafts[selectedBatchNumber] ?? "";
-    setSavingBatchNumber(selectedBatchNumber);
-    setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchNumber]: "" }));
+    if (!selectedUploadId || !selectedBatchKey || !selectedBatchOption) return;
+    const note = batchNoteDrafts[selectedBatchKey] ?? "";
+    setSavingBatchKey(selectedBatchKey);
+    setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchKey]: "" }));
 
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/data/batch-note`, {
@@ -516,7 +565,8 @@ export default function Data() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uploadId: selectedUploadId,
-          batchNumber: selectedBatchNumber,
+          batchNumber: selectedBatchOption.batchNumber,
+          batchDate: selectedBatchOption.batchDate,
           note,
         }),
       });
@@ -528,23 +578,23 @@ export default function Data() {
 
       setBatchNoteDrafts((prev) => ({
         ...prev,
-        [selectedBatchNumber]: responseBody.note ?? '',
+        [selectedBatchKey]: responseBody.note ?? '',
       }));
       setGraphData((prev) =>
         prev.map((row) =>
-          row.batchNumber === selectedBatchNumber ? { ...row, note: responseBody.note ?? "" } : row
+          row.batchKey === selectedBatchKey ? { ...row, note: responseBody.note ?? "" } : row
         )
       );
       setRawUploadRows((prev) =>
         prev.map((row) =>
-          row.batchNumber === selectedBatchNumber ? { ...row, note: responseBody.note ?? "" } : row
+          row.batchKey === selectedBatchKey ? { ...row, note: responseBody.note ?? "" } : row
         )
       );
-      setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchNumber]: "Saved" }));
+      setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchKey]: "Saved" }));
     } catch (error) {
-      setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchNumber]: "Save failed" }));
+      setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchKey]: "Save failed" }));
     } finally {
-      setSavingBatchNumber(null);
+      setSavingBatchKey(null);
     }
   };
 
@@ -568,7 +618,10 @@ export default function Data() {
       });
       const data = await res.json();
       if (res.ok) {
-        setUploadStatus(`Success! Processed ${data.rows || 0} rows.`);
+        const hasBatchWarnings = Array.isArray(data.batchWarnings) && data.batchWarnings.length > 0;
+        setUploadStatus(
+          `Success! Processed ${data.rows || 0} rows.${hasBatchWarnings ? ' Duplicate batch numbers were split by date in the viewer.' : ''}`
+        );
         setSelectedFile(null);
         fetchUploads();
       } else {
@@ -1064,8 +1117,8 @@ export default function Data() {
                   </label>
                   <select
                     id="batch-filter"
-                    value={selectedBatchNumber}
-                    onChange={(e) => setSelectedBatchNumber(e.target.value)}
+                    value={selectedBatchKey}
+                    onChange={(e) => setSelectedBatchKey(e.target.value)}
                     style={{
                       padding: "6px 10px",
                       borderRadius: "4px",
@@ -1074,12 +1127,12 @@ export default function Data() {
                       cursor: "pointer"
                     }}
                   >
-                    {availableBatchNumbers.length === 0 ? (
+                    {availableBatches.length === 0 ? (
                       <option value="" disabled>No batches available</option>
                     ) : (
-                      availableBatchNumbers.map((batch) => (
-                        <option key={batch} value={batch}>
-                          {batch === "Unspecified" ? "Unspecified" : `Batch ${batch}`}
+                      availableBatches.map((batch) => (
+                        <option key={batch.key} value={batch.key}>
+                          {batch.label}
                         </option>
                       ))
                     )}
@@ -1192,6 +1245,23 @@ export default function Data() {
                             </option>
                           ))}
                         </select>
+
+                        <button
+                          onClick={() => setIsTimestampPlaying((prev) => !prev)}
+                          disabled={!canPlayTimestamps}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc",
+                            cursor: !canPlayTimestamps ? "default" : "pointer",
+                            backgroundColor: !canPlayTimestamps
+                              ? "#f3f4f6"
+                              : (isTimestampPlaying ? "#e8f0fe" : "white"),
+                            fontWeight: 600,
+                          }}
+                        >
+                          {isTimestampPlaying ? "Pause" : "Play"}
+                        </button>
 
                         <button
                           onClick={() => setSelectedTimestampIndex((prev) => Math.min(prev + 1, selectedBatchGraphData.length - 1))}
@@ -1432,14 +1502,14 @@ export default function Data() {
                     <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
                       <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Batch Note</h4>
                       <p style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#555" }}>
-                        Add or update one note for the selected batch.
+                        Add or update one note for the selected batch instance.
                       </p>
                       <div style={{ fontSize: "13px", marginBottom: "8px", color: "#333" }}>
-                        Selected batch: {selectedBatchNumber === "Unspecified" ? "Unspecified" : `Batch ${selectedBatchNumber}`}
+                        Selected batch: {selectedBatchLabel || "No batch selected"}
                       </div>
                       <textarea
-                        value={batchNoteDrafts[selectedBatchNumber] ?? ""}
-                        onChange={(e) => handleBatchNoteDraftChange(selectedBatchNumber, e.target.value)}
+                        value={batchNoteDrafts[selectedBatchKey] ?? ""}
+                        onChange={(e) => handleBatchNoteDraftChange(selectedBatchKey, e.target.value)}
                         placeholder="Add note for this batch"
                         rows={3}
                         style={{
@@ -1454,28 +1524,28 @@ export default function Data() {
                       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
                         <button
                           onClick={handleSaveBatchNote}
-                          disabled={!selectedBatchNumber || savingBatchNumber === selectedBatchNumber}
+                          disabled={!selectedBatchKey || savingBatchKey === selectedBatchKey}
                           style={{
                             padding: "7px 12px",
                             borderRadius: "4px",
                             border: "none",
                             cursor: "pointer",
-                            backgroundColor: savingBatchNumber === selectedBatchNumber ? "#ccc" : "#1f6feb",
+                            backgroundColor: savingBatchKey === selectedBatchKey ? "#ccc" : "#1f6feb",
                             color: "white"
                           }}
                         >
-                          {savingBatchNumber === selectedBatchNumber ? "Saving..." : "Save"}
+                          {savingBatchKey === selectedBatchKey ? "Saving..." : "Save"}
                         </button>
                         <span
                           style={{
                             minWidth: "70px",
                             fontSize: "12px",
-                            color: batchNoteSaveStatus[selectedBatchNumber]
-                              ? (batchNoteSaveStatus[selectedBatchNumber] === "Saved" ? "green" : "red")
+                            color: batchNoteSaveStatus[selectedBatchKey]
+                              ? (batchNoteSaveStatus[selectedBatchKey] === "Saved" ? "green" : "red")
                               : "#555"
                           }}
                         >
-                          {batchNoteSaveStatus[selectedBatchNumber] || ""}
+                          {batchNoteSaveStatus[selectedBatchKey] || ""}
                         </span>
                       </div>
                     </div>

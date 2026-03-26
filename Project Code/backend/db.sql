@@ -144,10 +144,11 @@ CREATE TABLE data (
 CREATE TABLE batch_notes (
   upload_id BIGINT NOT NULL,
   batch_number VARCHAR(64) NOT NULL DEFAULT '',
+  batch_date DATE NOT NULL,
   note VARCHAR(511) NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (upload_id, batch_number)
+  PRIMARY KEY (upload_id, batch_number, batch_date)
 );
 
 -- Foreign Keys
