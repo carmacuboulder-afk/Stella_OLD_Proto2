@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 export default function Data() {
   const [activeTab, setActiveTab] = useState("history");
+  const [selectedReferenceBatchKey, setSelectedReferenceBatchKey] = useState(""); //for white reference
 
   const [uploads, setUploads] = useState([]);
   const [selectedUploadId, setSelectedUploadId] = useState(null);
@@ -165,7 +166,7 @@ export default function Data() {
   };
 
   const availableBatches = Array.from(
-    graphData.reduce((batches, row) => {
+    rawUploadRows.reduce((batches, row) => {
       if (!row.batchKey || batches.has(row.batchKey)) return batches;
 
       batches.set(row.batchKey, {
@@ -190,7 +191,10 @@ export default function Data() {
     if (aIsNumeric && !bIsNumeric) return -1;
     if (!aIsNumeric && bIsNumeric) return 1;
 
-    const batchCompare = a.batchNumber.localeCompare(b.batchNumber, undefined, { numeric: true, sensitivity: "base" });
+    const batchCompare = a.batchNumber.localeCompare(b.batchNumber, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
     if (batchCompare !== 0) return batchCompare;
 
     return a.batchDate.localeCompare(b.batchDate);
@@ -344,6 +348,17 @@ export default function Data() {
   }, [availableBatches, selectedBatchKey]);
 
   useEffect(() => {
+  if (availableBatches.length === 0) {
+    if (selectedReferenceBatchKey !== "") setSelectedReferenceBatchKey("");
+    return;
+  }
+
+  if (!availableBatches.some((batch) => batch.key === selectedReferenceBatchKey)) {
+    setSelectedReferenceBatchKey(availableBatches[0].key);
+  }
+}, [availableBatches, selectedReferenceBatchKey]);
+
+  useEffect(() => {
     setSelectedTimestampIndex(0);
     setIsTimestampPlaying(false);
   }, [selectedBatchKey, selectedUploadId]);
@@ -382,13 +397,23 @@ export default function Data() {
       return;
     }
 
-    const bandMaximums = wavelengthBands.reduce((accumulator, band) => {
-      const maxValue = rawUploadRows.reduce((currentMax, row) => {
-        const nextValue = Number(row[band.rawKey]) || 0;
-        return Math.max(currentMax, nextValue);
-      }, 0);
+    const referenceBatchRows = rawUploadRows.filter(
+      (row) => row.batchKey === selectedReferenceBatchKey
+    );
 
-      accumulator[band.nm] = maxValue;
+    const referenceRow = referenceBatchRows.reduce((bestRow, currentRow) => {
+      if (!bestRow) return currentRow;
+
+      const bestValue = toFiniteNumber(bestRow.n860, -Infinity);
+      const currentValue = toFiniteNumber(currentRow.n860, -Infinity);
+
+      return currentValue > bestValue ? currentRow : bestRow;
+    }, null);
+
+    const referenceBandValues = wavelengthBands.reduce((accumulator, band) => {
+      accumulator[band.nm] = referenceRow
+        ? toFiniteNumber(referenceRow[band.rawKey], 0)
+        : 0;
       return accumulator;
     }, {});
 
@@ -396,10 +421,15 @@ export default function Data() {
     const selectedNirBand = wavelengthLookup[selectedNirWavelength];
     const dswiRedBand = wavelengthLookup["680"];
     const greenBand = wavelengthLookup["550"];
+    const referenceBatchOption =
+      availableBatches.find((batch) => batch.key === selectedReferenceBatchKey) ?? null;
 
     const formatted = rawUploadRows.map((row, index) => {
       const reflectanceValues = wavelengthBands.reduce((accumulator, band) => {
-        accumulator[band.reflectanceKey] = safeDivide(Number(row[band.rawKey]) || 0, bandMaximums[band.nm]); //currently I am not imcorporating compensator. - xav
+        accumulator[band.reflectanceKey] = safeDivide(
+          Number(row[band.rawKey]) || 0,
+          referenceBandValues[band.nm]
+        );
         return accumulator;
       }, {});
 
@@ -407,7 +437,7 @@ export default function Data() {
       const selectedNirReflectance = reflectanceValues[selectedNirBand.reflectanceKey];
       const dswiGreenReflectance = reflectanceValues[greenBand.reflectanceKey];
       const dswiRedReflectance = reflectanceValues[dswiRedBand.reflectanceKey];
-      //all following variables use reflectance, not raw irradiance
+
       const ndvi = safeDivide(
         selectedNirReflectance - selectedRedReflectance,
         selectedNirReflectance + selectedRedReflectance
@@ -432,12 +462,17 @@ export default function Data() {
           nirWavelength: selectedNirWavelength,
           greenWavelength: "550",
           dswiRedWavelength: "680",
-          reflectanceMode: reflectanceMetadataLabel,
+          reflectanceMode: "Reference batch white-sheet normalization",
+          referenceBatchKey: selectedReferenceBatchKey,
+          referenceBatchLabel: referenceBatchOption?.label ?? "",
+          referenceTimestamp: referenceRow?.timeLabel ?? null,
+          referenceRule: "highest_860nm_in_reference_batch",
         },
       };
     });
 
     setGraphData(formatted);
+
     setBatchNoteDrafts((previous) => {
       const nextDrafts = { ...previous };
       formatted.forEach((row) => {
@@ -449,7 +484,12 @@ export default function Data() {
       });
       return nextDrafts;
     });
-  }, [rawUploadRows, selectedRedWavelength, selectedNirWavelength]);
+    }, [
+      rawUploadRows,
+      selectedReferenceBatchKey,
+      selectedRedWavelength,
+      selectedNirWavelength,
+    ]);
 
   const fetchUploads = async () => {
     try {
@@ -464,6 +504,7 @@ export default function Data() {
   const handleSelectUpload = async (uploadId) => {
     setSelectedUploadId(uploadId);
     setSelectedBatchKey("");
+    setSelectedReferenceBatchKey(""); //reset selected reference
     setRawUploadRows([]);
     setBatchNoteDrafts({});
     setBatchNoteSaveStatus({});
@@ -1111,76 +1152,123 @@ export default function Data() {
                   </Link>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
-                    Batch
-                  </label>
-                  <select
-                    id="batch-filter"
-                    value={selectedBatchKey}
-                    onChange={(e) => setSelectedBatchKey(e.target.value)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "4px",
-                      border: "1px solid #ccc",
-                      backgroundColor: "white",
-                      cursor: "pointer"
-                    }}
-                  >
-                    {availableBatches.length === 0 ? (
-                      <option value="" disabled>No batches available</option>
-                    ) : (
-                      availableBatches.map((batch) => (
-                        <option key={batch.key} value={batch.key}>
-                          {batch.label}
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "flex-end" }}> 
+                {/* Row 1 */}
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                      Batch
+                    </label>
+                    <select
+                      id="batch-filter"
+                      value={selectedBatchKey}
+                      onChange={(e) => setSelectedBatchKey(e.target.value)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        backgroundColor: "white",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {availableBatches.length === 0 ? (
+                        <option value="" disabled>No batches available</option>
+                      ) : (
+                        availableBatches.map((batch) => (
+                          <option key={batch.key} value={batch.key}>
+                            {batch.label}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <label htmlFor="reference-batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                      Reference Sheet
+                    </label>
+                    <select
+                      id="reference-batch-filter"
+                      value={selectedReferenceBatchKey}
+                      onChange={(e) => setSelectedReferenceBatchKey(e.target.value)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        backgroundColor: "white",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {availableBatches.length === 0 ? (
+                        <option value="" disabled>No batches available</option>
+                      ) : (
+                        availableBatches.map((batch) => (
+                          <option key={`reference-${batch.key}`} value={batch.key}>
+                            {batch.label}
+                          </option>
+                        ))
+                      )}
+                    </select>
+
+                    <button
+                      onClick={() => setSelectedReferenceBatchKey(selectedBatchKey)}
+                      disabled={!selectedBatchKey}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        cursor: !selectedBatchKey ? "default" : "pointer",
+                        backgroundColor: !selectedBatchKey ? "#f3f4f6" : "white",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Use displayed batch as reference
+                    </button>
+                  </div>
+
+                  {/* Row 2 */}
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+
+                    <label htmlFor="red-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                      RED
+                    </label>
+                    <select
+                      id="red-band-filter"
+                      value={selectedRedWavelength}
+                      onChange={(e) => setSelectedRedWavelength(e.target.value)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        backgroundColor: "white",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {wavelengthBands.map((band) => (
+                        <option key={`red-${band.nm}`} value={band.nm}>
+                          {band.label}
                         </option>
-                      ))
-                    )}
-                  </select>
+                      ))}
+                    </select>
 
-                  <label htmlFor="red-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
-                    RED
-                  </label>
-                  <select
-                    id="red-band-filter"
-                    value={selectedRedWavelength}
-                    onChange={(e) => setSelectedRedWavelength(e.target.value)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "4px",
-                      border: "1px solid #ccc",
-                      backgroundColor: "white",
-                      cursor: "pointer"
-                    }}
-                  >
-                    {wavelengthBands.map((band) => (
-                      <option key={`red-${band.nm}`} value={band.nm}>
-                        {band.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label htmlFor="nir-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
-                    NIR
-                  </label>
-                  <select
-                    id="nir-band-filter"
-                    value={selectedNirWavelength}
-                    onChange={(e) => setSelectedNirWavelength(e.target.value)}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: "4px",
-                      border: "1px solid #ccc",
-                      backgroundColor: "white",
-                      cursor: "pointer"
-                    }}
-                  >
-                    {wavelengthBands.map((band) => (
-                      <option key={`nir-${band.nm}`} value={band.nm}>
-                        {band.label}
-                      </option>
-                    ))}
-                  </select>
+                    <label htmlFor="nir-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                      NIR
+                    </label>
+                    <select
+                      id="nir-band-filter"
+                      value={selectedNirWavelength}
+                      onChange={(e) => setSelectedNirWavelength(e.target.value)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "4px",
+                        border: "1px solid #ccc",
+                        backgroundColor: "white",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {wavelengthBands.map((band) => (
+                        <option key={`nir-${band.nm}`} value={band.nm}>
+                          {band.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                 </div>
               </div>
@@ -1206,6 +1294,13 @@ export default function Data() {
                         <div style={{ fontSize: "13px", color: "#555", marginTop: "4px" }}>
                           Snapshot {clampedTimestampIndex + 1} of {selectedBatchGraphData.length}
                         </div>
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#555", marginTop: "4px" }}>
+                        Reference sheet:{" "}
+                        {selectedGraphRow?.calculationMetadata?.referenceBatchLabel || "--"}
+                        {selectedGraphRow?.calculationMetadata?.referenceTimestamp
+                          ? ` • brightest 860nm snapshot: ${selectedGraphRow.calculationMetadata.referenceTimestamp}`
+                          : ""}
                       </div>
 
                       <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
