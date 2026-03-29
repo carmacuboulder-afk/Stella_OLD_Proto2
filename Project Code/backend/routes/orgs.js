@@ -78,26 +78,24 @@ router.get('/search', async (req, res, next) => {
   }
 
   try {
-    // GET /api/orgs/search?name=
     const result = await pool.query(
       `SELECT o.id, o.name, o.description,
               u.username AS owner_username,
               COUNT(CASE WHEN uo.status = 'accepted' THEN 1 END) AS member_count
-      FROM organizations o
-      LEFT JOIN users u ON u.id = o.owner_user_id
-      LEFT JOIN user_organizations uo ON uo.organization_id = o.id
-      WHERE o.name ILIKE $1
-      AND o.id NOT IN (
-        SELECT organization_id FROM user_organizations
-        WHERE user_id = $2
-      )
-      GROUP BY o.id, u.username
-      LIMIT 10`,
+       FROM organizations o
+       LEFT JOIN users u ON u.id = o.owner_user_id
+       LEFT JOIN user_organizations uo ON uo.organization_id = o.id
+       WHERE o.name ILIKE $1
+       AND o.id NOT IN (
+         SELECT organization_id FROM user_organizations
+         WHERE user_id = $2
+       )
+       GROUP BY o.id, u.username
+       LIMIT 10`,
       [`%${name.trim()}%`, req.user_id]
     );
     return res.status(200).json(result.rows);
-  } 
-  catch (err) {
+  } catch (err) {
     next(err);
   }
 });
@@ -330,6 +328,15 @@ router.put('/:id/transfer/:userId', requireOrgOwner, async (req, res, next) => {
     );
     if (memberCheck.rows.length < 1) {
       return res.status(400).json({ error: 'User is not an accepted member of this organization' });
+    }
+
+    // New owner must not already own an org
+    const ownerCheck = await pool.query(
+      `SELECT owned_org_id FROM users WHERE id = $1`,
+      [userId]
+    );
+    if (ownerCheck.rows[0].owned_org_id !== null) {
+      return res.status(409).json({ error: 'That user already owns an organization' });
     }
 
     const client = await pool.connect();
