@@ -64,7 +64,6 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
         
         await client.query('BEGIN');
 
-
         const deviceRes = await client.query(
           "SELECT id FROM devices WHERE device_type = $1 LIMIT 1", 
           [deviceType]
@@ -86,7 +85,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
         
         const uploadRes = await client.query(
           `INSERT INTO uploads (
-            user_id, team_id, device_id, upload_name, timestamp_iso8601
+            user_id, org_id, device_id, upload_name, timestamp_iso8601
           ) VALUES ($1, NULL, $2, $3, $4) RETURNING id`,
           [DEFAULT_USER_ID, deviceId, req.file.originalname, fileTimestamp]
         );
@@ -220,7 +219,7 @@ const parseVal = (val) => {
   return isNaN(parsed) ? null : parsed;
 };
 
-// POST /api/uploads/live/start - Start a new live session
+// POST /api/uploads/live/start
 router.post('/live/start', async (req, res, next) => {
   const { device_type, software_version } = req.body;
 
@@ -233,7 +232,6 @@ router.post('/live/start', async (req, res, next) => {
   try {
     await client.query('BEGIN');
 
-    // Find or create device
     let deviceId;
     const deviceRes = await client.query(
       "SELECT id FROM devices WHERE device_type = $1 AND software_version = $2 LIMIT 1",
@@ -250,7 +248,6 @@ router.post('/live/start', async (req, res, next) => {
       deviceId = newDevice.rows[0].id;
     }
 
-    // Create upload session
     const DEFAULT_USER_ID = 1;
     const timestamp = new Date().toISOString();
     const uploadName = `Live Session - ${new Date().toLocaleString()}`;
@@ -278,7 +275,7 @@ router.post('/live/start', async (req, res, next) => {
   }
 });
 
-// POST /api/uploads/live/data - Add data to existing session
+// POST /api/uploads/live/data
 router.post('/live/data', async (req, res, next) => {
   const { sessionId, deviceId, ...liveData } = req.body;
 
@@ -294,7 +291,6 @@ router.post('/live/data', async (req, res, next) => {
       device_id: deviceId,
       timestamp_iso8601: timestamp,
       
-      // Environmental sensors
       surface_temperature_C: parseVal(liveData.surface_temp),
       air_temperature_C: parseVal(liveData.air_temp),
       relative_humidity_percent: parseVal(liveData.rel_humidity),
@@ -302,7 +298,6 @@ router.post('/live/data', async (req, res, next) => {
       altitude_uncalibrated_m: parseVal(liveData.altitude),
       range_m: parseVal(liveData.range),
       
-      // Visible light spectrum
       irradiance_450nm_blue_irradiance_uW_per_cm_squared: parseVal(liveData.v450),
       irradiance_500nm_cyan_irradiance_uW_per_cm_squared: parseVal(liveData.b500),
       irradiance_550nm_green_irradiance_uW_per_cm_squared: parseVal(liveData.g550),
@@ -310,7 +305,6 @@ router.post('/live/data', async (req, res, next) => {
       irradiance_600nm_orange_irradiance_uW_per_cm_squared: parseVal(liveData.o600),
       irradiance_650nm_red_irradiance_uW_per_cm_squared: parseVal(liveData.r650),
       
-      // Near-infrared spectrum
       irradiance_610nm_orange_irradiance_uW_per_cm_squared: parseVal(liveData['610']),
       irradiance_680nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['680']),
       irradiance_730nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['730']),
@@ -319,7 +313,6 @@ router.post('/live/data', async (req, res, next) => {
       irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared: parseVal(liveData['860']),
     };
 
-    // Insert data
     const columns = Object.keys(dataRow);
     const values = Object.values(dataRow);
     const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
@@ -337,7 +330,7 @@ router.post('/live/data', async (req, res, next) => {
   }
 });
 
-// POST /api/uploads/live/end - End a live session (optional, for cleanup)
+// POST /api/uploads/live/end
 router.post('/live/end', async (req, res, next) => {
   const { sessionId } = req.body;
 
@@ -346,7 +339,6 @@ router.post('/live/end', async (req, res, next) => {
   }
 
   try {
-    // Update the upload name to include end time and data count
     const countRes = await pool.query(
       'SELECT COUNT(*) as count FROM data WHERE upload_id = $1',
       [sessionId]
@@ -380,49 +372,6 @@ router.get('/:id/data', async (req, res, next) => {
     next(err);
   }
 });
-
-// // POST /api/uploads
-// router.post('/', async (req, res, next) => {
-//   const {
-//     userId,
-//     teamId,
-//     isPublic,
-//     deviceId,
-//     uploadName,
-//     latitude,
-//     longitude,
-//     locationLabel,
-//     weekday,
-//     timestampIso8601
-//   } = req.body;
-
-//   try {
-//     const result = await pool.query(
-//       `INSERT INTO uploads (
-//         user_id, team_id, is_public, device_id, upload_name,
-//         latitude, longitude, location_label, weekday, timestamp_iso8601
-//       )
-//       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-//       RETURNING *`,
-//       [
-//         userId,
-//         teamId || null,
-//         isPublic || false,
-//         deviceId,
-//         uploadName,
-//         latitude,
-//         longitude,
-//         locationLabel,
-//         weekday,
-//         timestampIso8601
-//       ]
-//     );
-
-//     res.status(201).json(result.rows[0]);
-//   } catch (err) {
-//     next(err);
-//   }
-// });
 
 // GET /api/uploads/:id
 router.get('/:id', async (req, res, next) => {
