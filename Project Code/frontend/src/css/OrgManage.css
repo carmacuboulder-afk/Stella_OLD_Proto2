@@ -1,0 +1,167 @@
+.org-manage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+}
+
+.org-manage h1 {
+    margin-bottom: 1.5rem;
+}
+
+.org-manage-container {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Section blocks */
+.org-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.org-section label {
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+/* Detail value blocks — reuses account-value style */
+.org-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+/* Edit form */
+.edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.edit-form .input-container {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.edit-form textarea.input-container {
+    resize: vertical;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* Member rows */
+.member-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    gap: 0.75rem;
+}
+
+.member-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.member-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.member-meta {
+    font-size: 0.78rem;
+    color: #666;
+}
+
+/* Owner tag next to username */
+.owner-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    background-color: #c7dbc4;
+    color: #2d5a27;
+    border-radius: 999px;
+    padding: 1px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Button rows inside member rows */
+.org-button-row {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+/* Pending count badge */
+.pending-badge {
+    display: inline-block;
+    background-color: #e53e3e;
+    color: white;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* Button variants — scoped to org-manage */
+.org-manage .submitButton {
+    white-space: nowrap;
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background-color: #e0e0e0;
+    color: #333;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.org-manage .submitButton:hover {
+    background-color: #cacaca;
+}
+
+.org-manage .btn-secondary {
+    background-color: #e0e0e0;
+    color: #333;
+}
+
+.org-manage .btn-secondary:hover {
+    background-color: #cacaca;
+}
+
+.org-manage .btn-accept {
+    background-color: #c7dbc4;
+    color: #1a3d18;
+}
+
+.org-manage .btn-accept:hover {
+    background-color: #aecbaa;
+}
+
+.org-manage .btn-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.org-manage .btn-danger:hover {
+    background-color: #f1b0b7;
+}
+
+/* Transfer ownership select */
+.org-manage .add-field-row select.input-container {
+    flex: 1;
+}

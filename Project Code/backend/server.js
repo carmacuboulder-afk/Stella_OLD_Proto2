@@ -11,6 +11,7 @@ import teamMembersRouter from './routes/teamMembers.js';
 import devicesRouter from './routes/devices.js';
 import uploadsRouter from './routes/uploads.js';
 import dataRouter from './routes/data.js';
+import orgsRouter from './routes/orgs.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -52,6 +53,7 @@ app.use('/api/team-members', teamMembersRouter);
 app.use('/api/devices', devicesRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/data', dataRouter);
+app.use('/api/orgs', orgsRouter);
 
 app.use((req, res, next) => {
   res.status(404).json({ error: 'Not found' });
