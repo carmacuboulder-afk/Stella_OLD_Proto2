@@ -99,10 +99,7 @@ curl -X POST "https://api.example.com/api/auth/login" \
     "id": 1,
     "username": "developer1",
     "email": "developer@example.com",
-    "role": "user",
-    "school": "Example University",
-    "organization": "Example Org",
-    "created_at": "2026-03-23T00:00:00.000Z"
+    "role": "user"
   }
 }
 ```
@@ -111,7 +108,7 @@ curl -X POST "https://api.example.com/api/auth/login" \
 
 ```json
 {
-  "error": "Missing login field."
+  "error": "username/email and password are required"
 }
 ```
 
@@ -122,7 +119,41 @@ curl -X POST "https://api.example.com/api/auth/login" \
   "error": "Invalid credentials"
 }
 ```
+# Token Check
 
+GET /auth/me
+
+Returns the authenticated user associated with the provided JWT.
+
+### Required Header
+
+```Authorization: Bearer <token>```
+
+### Example Request
+```
+curl "https://api.example.com/api/auth/me" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+### Response (200 OK)
+```
+{
+  "id": 1,
+  "username": "developer1",
+  "email": "developer@example.com",
+  "role": "user",
+  "created_at": "2026-03-23T00:00:00.000Z"
+}
+```
+### Response (404 Not Found)
+```
+{
+  "id": 1,
+  "username": "developer1",
+  "email": "developer@example.com",
+  "role": "user",
+  "created_at": "2026-03-23T00:00:00.000Z"
+}
+```
 ---
 
 # External API
@@ -606,7 +637,7 @@ Returns a single data object in the same structure as the `/external/data` colle
 
 ```json
 {
-  "error": "Data record not found"
+  "error": "Data row not found"
 }
 ```
 
