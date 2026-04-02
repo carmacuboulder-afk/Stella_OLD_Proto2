@@ -1,5 +1,6 @@
 import "../css/Register.css";
 import { useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 
 function Login() {
@@ -17,6 +18,19 @@ function Login() {
     const [school, setSchool] = useState("");
     const [org, setOrg] = useState("");
 
+    useEffect(() => {
+        const footer = document.getElementById("site-footer");
+        if (footer) {
+            footer.style.display = "none";
+        }
+
+        return () => {
+            if (footer) {
+                footer.style.display = "block";
+            }
+        };
+    }, []);
+
     const showToast = (msg, type) => {
         setToast({msg, type});
         setTimeout(() => setToast(null), 2000);
@@ -29,7 +43,14 @@ function Login() {
             const response = await fetch("http://localhost:8000/api/users/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, email, password_one, password_two, school, org })
+                body: JSON.stringify({ 
+                    username, 
+                    email, 
+                    password_one, 
+                    password_two, 
+                    schools: school ? [school] : [],   
+                    orgs: org ? [org] : []             
+                })
             });
 
             const data = await response.json();
@@ -40,7 +61,7 @@ function Login() {
 
             console.log("Register successful:", data);
             showToast("Registration Successful!", "success");
-            setTimeout(() => nav("/login"), 2000);            
+            setTimeout(() => nav("/login"), 1000);            
             
         } 
         catch (err) {

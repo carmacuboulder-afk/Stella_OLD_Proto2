@@ -14,12 +14,6 @@
   align-items: center;
 }
 
-.header {
-    display: flex;
-    align-items: center;       
-    justify-content: space-between;  /* logo left, links right */
-    padding: 20px 40px;         /* arbitrary until it looks pretty*/
-}
 .navbar img {
     height: 60px;         
     margin-bottom: 0;
@@ -49,4 +43,79 @@
 /* Make the Log In link slightly bolder */
 .login-link {
   font-weight: 600;
+}
+
+/* logout link style */
+.logout-button {
+  font-weight: 500;
+}
+
+.account-menu,
+.resources-menu {
+  position: relative;
+}
+
+.account-btn,
+.resources-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: black;
+  padding: 0;
+  font-weight: 500;
+}
+
+.account-btn
+.resources-btn { 
+  font-weight: 500;
+}
+
+.account-btn:hover,
+.resources-btn:hover {
+  color: #2e7d32;
+}
+
+.account-dropdown,
+.resources-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-width: 140px;
+  z-index: 100;
+  flex-direction: column;
+}
+
+.account-menu:hover .account-dropdown,
+.resources-menu:hover .resources-dropdown {
+  display: flex;
+}
+
+.account-dropdown a,
+.account-dropdown button,
+.resources-dropdown a,
+.resources-dropdown button {
+  padding: 10px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: black;
+  text-decoration: none;
+  display: block;
+  width: 100%;
+}
+
+.account-dropdown a:hover,
+.account-dropdown button:hover,
+.resources-dropdown a:hover,
+.resources-dropdown button:hover {
+  background-color: #f5f5f5;
+  color: #2e7d32;
 }

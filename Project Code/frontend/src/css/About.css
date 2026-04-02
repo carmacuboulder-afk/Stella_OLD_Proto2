@@ -26,3 +26,19 @@
     margin: 1rem;
     margin-top: 1rem;
 }
+
+.about-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.about-text {
+  flex: 1;
+}
+
+/* hide footer on about page */
+.about ~ footer {
+  display: none;
+}
