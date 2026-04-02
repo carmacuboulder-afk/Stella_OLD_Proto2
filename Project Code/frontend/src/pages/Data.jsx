@@ -101,6 +101,17 @@ export default function Data() {
       second: '2-digit',
     });
   };
+  const normalizeBatchDate = (rawBatchDate, fallbackDate) => {
+    const normalizedFallback = fallbackDate.toISOString().slice(0, 10);
+    const trimmedValue = `${rawBatchDate ?? ""}`.trim();
+
+    if (!trimmedValue) return normalizedFallback;
+
+    const isoDateMatch = trimmedValue.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoDateMatch) return isoDateMatch[1];
+
+    return trimmedValue;
+  };
   const buildBatchKey = (batchNumber, batchDate) => `${batchNumber}::${batchDate}`;
   const buildBatchLabel = (batchNumber, batchDate) => (
     batchNumber === "Unspecified"
@@ -164,6 +175,23 @@ export default function Data() {
       }))
       .sort((a, b) => a.wavelength - b.wavelength);
   };
+  const resolveFlatNonNegativeDomain = (values) => {
+    const finiteValues = values
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value));
+
+    if (finiteValues.length === 0) return ['auto', 'auto'];
+
+    const minValue = Math.min(...finiteValues);
+    const maxValue = Math.max(...finiteValues);
+
+    if (minValue < 0 || Math.abs(maxValue - minValue) > 1e-9) {
+      return ['auto', 'auto'];
+    }
+
+    const padding = maxValue === 0 ? 1 : Math.max(Math.abs(maxValue) * 0.1, 0.1);
+    return [Math.max(0, minValue - padding), maxValue + padding];
+  };
 
   const availableBatches = Array.from(
     rawUploadRows.reduce((batches, row) => {
@@ -217,6 +245,9 @@ export default function Data() {
   const lastTimeAxisTick = timeAxisTicks[timeAxisTicks.length - 1];
   const rawSpectrumData = buildSpectrumPoints(selectedGraphRow, "rawKey");
   const reflectanceSpectrumData = buildSpectrumPoints(selectedGraphRow, "reflectanceKey");
+  const reflectanceSpectrumDomain = resolveFlatNonNegativeDomain(
+    reflectanceSpectrumData.map((point) => point.magnitude)
+  );
   const graphConfigurations = [
     {
       key: "raw_spectrum",
@@ -241,6 +272,11 @@ export default function Data() {
       chartType: "bar",
     },
   ];
+  const reflectanceOverTimeDomain = resolveFlatNonNegativeDomain(
+    selectedBatchTimeSeriesData.flatMap((row) =>
+      wavelengthBands.map((band) => row[band.reflectanceKey])
+    )
+  );
   const selectedSnapshotCards = selectedGraphRow ? [
     { label: "Surface Temp", value: formatMetricValue(selectedGraphRow.surface_temp, 2, " °C") },
     { label: "Air Temp", value: formatMetricValue(selectedGraphRow.air_temp, 2, " °C") },
@@ -301,17 +337,31 @@ export default function Data() {
         { dataKey: "air_temp", stroke: "#1E90FF", name: "Air Temp" },
       ],
     },
+  ];
+  const vegetationIndexTimeSeriesConfigurations = [
     {
-      key: "indices_over_time",
-      title: "Vegetation Indices Over Time",
-      subtitle: "NDVI, SR, DSWI 4, and NIRv for the selected batch over time.",
-      yAxisLabel: "Index Value",
-      lines: [
-        { dataKey: "ndvi", stroke: "#2E8B57", name: "NDVI" },
-        { dataKey: "sr", stroke: "#1E90FF", name: "SR" },
-        { dataKey: "dswi4", stroke: "#A0522D", name: "DSWI 4" },
-        { dataKey: "nirv", stroke: "#800080", name: "NIRv" },
-      ],
+      key: "ndvi_over_time",
+      title: "NDVI Over Time",
+      yAxisLabel: "NDVI",
+      lines: [{ dataKey: "ndvi", stroke: "#2E8B57", name: "NDVI" }],
+    },
+    {
+      key: "sr_over_time",
+      title: "SR Over Time",
+      yAxisLabel: "SR",
+      lines: [{ dataKey: "sr", stroke: "#1E90FF", name: "SR" }],
+    },
+    {
+      key: "dswi4_over_time",
+      title: "DSWI 4 Over Time",
+      yAxisLabel: "DSWI 4",
+      lines: [{ dataKey: "dswi4", stroke: "#A0522D", name: "DSWI 4" }],
+    },
+    {
+      key: "nirv_over_time",
+      title: "NIRv Over Time",
+      yAxisLabel: "NIRv",
+      lines: [{ dataKey: "nirv", stroke: "#800080", name: "NIRv" }],
     },
   ];
 
@@ -521,7 +571,7 @@ export default function Data() {
         const date = new Date(row.timestamp_iso8601);
         const rawBatchNumber = row.batch_number ?? row.batch ?? row.batchNumber ?? "";
         const batchNumber = `${rawBatchNumber}`.trim() || "Unspecified";
-        const batchDate = `${row.batch_date ?? date.toISOString().slice(0, 10)}`.trim();
+        const batchDate = normalizeBatchDate(row.batch_date, date);
         const batchKey = buildBatchKey(batchNumber, batchDate);
         const v450 = parseOptionalNumber(row.irradiance_450nm_blue_irradiance_uw_per_cm_squared);
         const b500 = parseOptionalNumber(row.irradiance_500nm_cyan_irradiance_uw_per_cm_squared);
@@ -1003,13 +1053,104 @@ export default function Data() {
       ],
     },
   ];
+  const renderTimeSeriesChartCard = (config, containerStyle = {}) => (
+    <div
+      key={config.key}
+      style={{ border: "1px solid #d0d7de", borderRadius: "10px", padding: "14px", backgroundColor: "#fff", ...containerStyle }}
+    >
+      <h5 style={{ margin: "0 0 10px 0", fontWeight: 700, fontSize: "24px", textAlign: "center" }}>{config.title}</h5>
+      {config.lines.length > 1 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", justifyContent: "center", marginBottom: "10px" }}>
+          {config.lines.map((line) => (
+            <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+              <span style={{ width: "16px", height: "2px", backgroundColor: line.stroke, display: "inline-block" }} />
+              <span>{line.name}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div style={{ width: "100%", height: 340 }}>
+        <ResponsiveContainer>
+          <LineChart data={selectedBatchTimeSeriesData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="chartIndex"
+              type="number"
+              domain={[0, Math.max(selectedBatchTimeSeriesData.length - 1, 0)]}
+              ticks={timeAxisTicks}
+              allowDecimals={false}
+              interval={0}
+              tickMargin={12}
+              tick={({ x, y, payload }) => {
+                const pointIndex = Math.round(Number(payload.value));
+                const timeLabel = selectedBatchTimeSeriesData[pointIndex]?.timeLabel || "";
+                const isFirstTick = payload.value === firstTimeAxisTick;
+                const isLastTick = payload.value === lastTimeAxisTick;
+
+                return (
+                  <text
+                    x={x + (isFirstTick ? 12 : isLastTick ? -12 : 0)}
+                    y={y}
+                    dy={16}
+                    textAnchor={isFirstTick ? "start" : isLastTick ? "end" : "middle"}
+                    fill="#000"
+                    fontWeight={700}
+                    fontSize={13}
+                  >
+                    {timeLabel}
+                  </text>
+                );
+              }}
+              axisLine={{ stroke: '#000' }}
+              tickLine={{ stroke: '#000' }}
+            />
+            <YAxis
+              domain={config.key === "reflectance_over_time" ? reflectanceOverTimeDomain : ['auto', 'auto']}
+              width={95}
+              tickFormatter={(value) => formatNumberWithCommas(value, 2)}
+              tick={{ fontWeight: 700, fill: '#000' }}
+              axisLine={{ stroke: '#000' }}
+              tickLine={{ stroke: '#000' }}
+              label={{
+                value: config.yAxisLabel,
+                angle: -90,
+                position: 'left',
+                offset: 10,
+                style: { textAnchor: 'middle', fontWeight: 700, fill: '#000' }
+              }}
+            />
+            <Tooltip
+              formatter={(value, name) => [formatNumberWithCommas(value), name]}
+              labelFormatter={(value) => {
+                const pointIndex = Math.round(Number(value));
+                const point = selectedBatchTimeSeriesData[pointIndex];
+                return point ? `Time: ${point.timeLabel}` : `Time: ${value}`;
+              }}
+            />
+            {config.lines.map((line) => (
+              <Line
+                key={`${config.key}-${line.dataKey}`}
+                type="monotone"
+                dataKey={line.dataKey}
+                stroke={line.stroke}
+                dot={pointDotStyle}
+                activeDot={activePointDotStyle}
+                strokeWidth={2}
+                name={line.name}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ textAlign: "center", padding: "20px", maxWidth: "1680px", margin: "0 auto" }}>
 
 
       {/* tab toggle */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "30px" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "30px", zoom: "67%" }}>
         <button 
           onClick={() => setActiveTab("history")}
           style={{
@@ -1046,7 +1187,7 @@ export default function Data() {
       {/* history*/}
       {activeTab === "history" && (
         <div className="fade-in">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "40px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "40px", zoom: "67%" }}>
             
             {/* upload box */}
             <div style={{ 
@@ -1135,11 +1276,11 @@ export default function Data() {
 
           {/* graph */}
           {selectedUploadId && (
-            <div style={{ marginBottom: "50px", padding: "20px", border: "2px solid #000", borderRadius: "10px" }}>
+            <div style={{ marginBottom: "50px", padding: "20px", border: "2px solid #000", borderRadius: "10px", zoom: "67%" }}>
               
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
-                  <h3 style={{ margin: 0, fontWeight: 700 }}>Data Graphs</h3>
+                  <h3 style={{ margin: 0, fontWeight: 700, fontSize: "30px" }}>Data Graphs</h3>
                   <Link
                     to="/docs"
                     style={{
@@ -1152,9 +1293,7 @@ export default function Data() {
                   </Link>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "flex-end" }}> 
-                {/* Row 1 */}
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
                     <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
                       Batch
                     </label>
@@ -1206,24 +1345,27 @@ export default function Data() {
                       )}
                     </select>
 
-                    <button
-                      onClick={() => setSelectedReferenceBatchKey(selectedBatchKey)}
-                      disabled={!selectedBatchKey}
+                    <label htmlFor="nir-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
+                      NIR
+                    </label>
+                    <select
+                      id="nir-band-filter"
+                      value={selectedNirWavelength}
+                      onChange={(e) => setSelectedNirWavelength(e.target.value)}
                       style={{
-                        padding: "8px 12px",
+                        padding: "6px 10px",
                         borderRadius: "4px",
                         border: "1px solid #ccc",
-                        cursor: !selectedBatchKey ? "default" : "pointer",
-                        backgroundColor: !selectedBatchKey ? "#f3f4f6" : "white",
-                        fontWeight: 600,
+                        backgroundColor: "white",
+                        cursor: "pointer"
                       }}
                     >
-                      Use displayed batch as reference
-                    </button>
-                  </div>
-
-                  {/* Row 2 */}
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      {wavelengthBands.map((band) => (
+                        <option key={`nir-${band.nm}`} value={band.nm}>
+                          {band.label}
+                        </option>
+                      ))}
+                    </select>
 
                     <label htmlFor="red-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
                       RED
@@ -1247,29 +1389,6 @@ export default function Data() {
                       ))}
                     </select>
 
-                    <label htmlFor="nir-band-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
-                      NIR
-                    </label>
-                    <select
-                      id="nir-band-filter"
-                      value={selectedNirWavelength}
-                      onChange={(e) => setSelectedNirWavelength(e.target.value)}
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        backgroundColor: "white",
-                        cursor: "pointer"
-                      }}
-                    >
-                      {wavelengthBands.map((band) => (
-                        <option key={`nir-${band.nm}`} value={band.nm}>
-                          {band.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                 </div>
               </div>
 
@@ -1289,18 +1408,10 @@ export default function Data() {
                       backgroundColor: "#f8fafc"
                     }}>
                       <div style={{ textAlign: "left" }}>
-                        <div style={{ fontSize: "13px", color: "#555", marginBottom: "4px" }}>Selected timestamp</div>
                         <div style={{ fontSize: "20px", fontWeight: 700 }}>{selectedGraphRow?.timeLabel || "--"}</div>
                         <div style={{ fontSize: "13px", color: "#555", marginTop: "4px" }}>
                           Snapshot {clampedTimestampIndex + 1} of {selectedBatchGraphData.length}
                         </div>
-                      </div>
-                      <div style={{ fontSize: "13px", color: "#555", marginTop: "4px" }}>
-                        Reference sheet:{" "}
-                        {selectedGraphRow?.calculationMetadata?.referenceBatchLabel || "--"}
-                        {selectedGraphRow?.calculationMetadata?.referenceTimestamp
-                          ? ` • brightest 860nm snapshot: ${selectedGraphRow.calculationMetadata.referenceTimestamp}`
-                          : ""}
                       </div>
 
                       <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -1377,7 +1488,7 @@ export default function Data() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "30px" }}>
                       {graphConfigurations.map((config) => (
                         <div key={config.key} style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 14px 0", fontWeight: 700, fontSize: "20px", textAlign: "center" }}>{config.title}</h4>
+                          <h4 style={{ margin: "0 0 14px 0", fontWeight: 700, fontSize: "24px", textAlign: "center" }}>{config.title}</h4>
                           <div style={{ width: '100%', height: 430 }}>
                             <ResponsiveContainer>
                               {config.chartType === "bar" ? (
@@ -1398,7 +1509,7 @@ export default function Data() {
                                     }}
                                   />
                                   <YAxis
-                                    domain={['auto', 'auto']}
+                                    domain={config.key === "reflectance_spectrum" ? reflectanceSpectrumDomain : ['auto', 'auto']}
                                     width={95}
                                     tickFormatter={(value) => formatNumberWithCommas(value, 2)}
                                     tick={{ fontWeight: 700, fill: '#000' }}
@@ -1471,10 +1582,7 @@ export default function Data() {
                     </div>
 
                     <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
-                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Selected Timestamp Summary</h4>
-                      <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "#555" }}>
-                        Non-spectral values are shown here for the currently selected timestamp, while the charts stay wavelength-based.
-                      </p>
+                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700, fontSize: "24px" }}>Selected Timestamp Summary</h4>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
                         {selectedSnapshotCards.map((card) => (
                           <div
@@ -1494,111 +1602,25 @@ export default function Data() {
                     </div>
 
                     <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
-                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Selected Batch Over Time</h4>
-                      <p style={{ margin: "0 0 18px 0", fontSize: "13px", color: "#555" }}>
-                        These charts show how the currently selected batch changes across timestamps, while the spectrum view above stays focused on one selected snapshot.
-                      </p>
+                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700, fontSize: "24px" }}>Selected Batch Over Time</h4>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px" }}>
-                        {timeSeriesGraphConfigurations.map((config) => (
-                          <div key={config.key} style={{ border: "1px solid #d0d7de", borderRadius: "10px", padding: "14px", backgroundColor: "#fff" }}>
-                            <h5 style={{ margin: "0 0 10px 0", fontWeight: 700, fontSize: "20px", textAlign: "center" }}>{config.title}</h5>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", justifyContent: "center", marginBottom: "10px" }}>
-                              {config.lines.map((line) => (
-                                <div key={`${config.key}-${line.dataKey}-legend`} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
-                                  <span style={{ width: "16px", height: "2px", backgroundColor: line.stroke, display: "inline-block" }} />
-                                  <span>{line.name}</span>
-                                </div>
-                              ))}
-                            </div>
-                            <div style={{ width: "100%", height: 340 }}>
-                              <ResponsiveContainer>
-                                <LineChart data={selectedBatchTimeSeriesData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis
-                                    dataKey="chartIndex"
-                                    type="number"
-                                    domain={[0, Math.max(selectedBatchTimeSeriesData.length - 1, 0)]}
-                                    ticks={timeAxisTicks}
-                                    allowDecimals={false}
-                                    interval={0}
-                                    tickMargin={12}
-                                    tick={({ x, y, payload }) => {
-                                      const pointIndex = Math.round(Number(payload.value));
-                                      const timeLabel = selectedBatchTimeSeriesData[pointIndex]?.timeLabel || "";
-                                      const isFirstTick = payload.value === firstTimeAxisTick;
-                                      const isLastTick = payload.value === lastTimeAxisTick;
-
-                                      return (
-                                        <text
-                                          x={x + (isFirstTick ? 12 : isLastTick ? -12 : 0)}
-                                          y={y}
-                                          dy={16}
-                                          textAnchor={isFirstTick ? "start" : isLastTick ? "end" : "middle"}
-                                          fill="#000"
-                                          fontWeight={700}
-                                          fontSize={13}
-                                        >
-                                          {timeLabel}
-                                        </text>
-                                      );
-                                    }}
-                                    axisLine={{ stroke: '#000' }}
-                                    tickLine={{ stroke: '#000' }}
-                                    label={{
-                                      value: 'Time',
-                                      position: 'insideBottom',
-                                      offset: -14,
-                                      style: { fontWeight: 700, fill: '#000' }
-                                    }}
-                                  />
-                                  <YAxis
-                                    domain={['auto', 'auto']}
-                                    width={95}
-                                    tickFormatter={(value) => formatNumberWithCommas(value, 2)}
-                                    tick={{ fontWeight: 700, fill: '#000' }}
-                                    axisLine={{ stroke: '#000' }}
-                                    tickLine={{ stroke: '#000' }}
-                                    label={{
-                                      value: config.yAxisLabel,
-                                      angle: -90,
-                                      position: 'left',
-                                      offset: 10,
-                                      style: { textAnchor: 'middle', fontWeight: 700, fill: '#000' }
-                                    }}
-                                  />
-                                  <Tooltip
-                                    formatter={(value, name) => [formatNumberWithCommas(value), name]}
-                                    labelFormatter={(value) => {
-                                      const pointIndex = Math.round(Number(value));
-                                      const point = selectedBatchTimeSeriesData[pointIndex];
-                                      return point ? `Time: ${point.timeLabel}` : `Time: ${value}`;
-                                    }}
-                                  />
-                                  {config.lines.map((line) => (
-                                    <Line
-                                      key={`${config.key}-${line.dataKey}`}
-                                      type="monotone"
-                                      dataKey={line.dataKey}
-                                      stroke={line.stroke}
-                                      dot={pointDotStyle}
-                                      activeDot={activePointDotStyle}
-                                      strokeWidth={2}
-                                      name={line.name}
-                                    />
-                                  ))}
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
+                        {timeSeriesGraphConfigurations.map((config) => renderTimeSeriesChartCard(config))}
+                        <div style={{ border: "1px solid #d0d7de", borderRadius: "10px", padding: "14px", backgroundColor: "#fff" }}>
+                          <h5 style={{ margin: "0 0 14px 0", fontWeight: 700, fontSize: "24px", textAlign: "center" }}>Vegetation Indices Over Time</h5>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+                            {vegetationIndexTimeSeriesConfigurations.map((config) => (
+                              renderTimeSeriesChartCard(config, {
+                                flex: "1 1 calc(50% - 8px)",
+                                minWidth: "320px",
+                              })
+                            ))}
                           </div>
-                        ))}
+                        </div>
                       </div>
                     </div>
 
                     <div style={{ marginTop: "24px", textAlign: "left", border: "1px solid #222", borderRadius: "8px", padding: "14px" }}>
-                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700 }}>Batch Note</h4>
-                      <p style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#555" }}>
-                        Add or update one note for the selected batch instance.
-                      </p>
+                      <h4 style={{ margin: "0 0 12px 0", fontWeight: 700, fontSize: "24px" }}>Batch Note</h4>
                       <div style={{ fontSize: "13px", marginBottom: "8px", color: "#333" }}>
                         Selected batch: {selectedBatchLabel || "No batch selected"}
                       </div>
@@ -1625,7 +1647,7 @@ export default function Data() {
                             borderRadius: "4px",
                             border: "none",
                             cursor: "pointer",
-                            backgroundColor: savingBatchKey === selectedBatchKey ? "#ccc" : "#1f6feb",
+                            backgroundColor: savingBatchKey === selectedBatchKey ? "#ccc" : "#28a745",
                             color: "white"
                           }}
                         >
@@ -1654,7 +1676,7 @@ export default function Data() {
 
       {/* live */}
       {activeTab === "live" && (
-        <div className="fade-in">
+        <div className="fade-in" style={{ zoom: "67%" }}>
           <div style={{ display: "flex", justifyContent: "center", gap: "15px", marginBottom: "30px" }}>
             <button
               onClick={connectToSerial}
