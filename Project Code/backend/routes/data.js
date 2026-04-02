@@ -29,11 +29,18 @@ router.post('/', async (req, res, next) => {
 // GET /api/data/upload/:uploadId
 router.get('/upload/:uploadId', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT *
-       FROM data
-       WHERE upload_id = $1
-       ORDER BY id`,
+    const result = await pool.query( //coalesce handles empty notes
+      `SELECT
+         d.*,
+         (d.timestamp_iso8601 AT TIME ZONE 'UTC')::date AS batch_date,
+         COALESCE(bn.note, '') AS note
+       FROM data d
+       LEFT JOIN batch_notes bn
+         ON bn.upload_id = d.upload_id
+        AND bn.batch_number = COALESCE(NULLIF(BTRIM(d.batch_number), ''), '')
+        AND bn.batch_date = (d.timestamp_iso8601 AT TIME ZONE 'UTC')::date
+       WHERE d.upload_id = $1
+       ORDER BY d.id`,
       [req.params.uploadId]
     );
     res.json(result.rows);
@@ -56,6 +63,54 @@ router.put('/:id/coordinates', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/data/batch-note
+router.put('/batch-note', async (req, res, next) => {
+  const { uploadId, batchNumber, batchDate, note } = req.body;
+  const normalizedBatchNumber = `${batchNumber ?? ''}`.trim();
+  const storedBatchNumber = normalizedBatchNumber === 'Unspecified' ? '' : normalizedBatchNumber;
+  const storedBatchDate = `${batchDate ?? ''}`.trim();
+
+  if (!storedBatchDate) {
+    return res.status(400).json({ error: 'Batch date is required' });
+  }
+
+  try {
+    const batchExists = await pool.query(
+      `SELECT 1
+       FROM data
+       WHERE upload_id = $1
+         AND COALESCE(NULLIF(BTRIM(batch_number), ''), '') = $2
+         AND (timestamp_iso8601 AT TIME ZONE 'UTC')::date = $3::date
+       LIMIT 1`,
+      [uploadId, storedBatchNumber, storedBatchDate]
+    );
+
+    if (batchExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Batch not found for this upload' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO batch_notes (upload_id, batch_number, batch_date, note)
+       VALUES ($1, $2, $3::date, $4)
+       ON CONFLICT (upload_id, batch_number, batch_date)
+       DO UPDATE SET
+         note = EXCLUDED.note,
+         updated_at = NOW()
+       RETURNING upload_id, batch_number, batch_date, note`,
+      [uploadId, storedBatchNumber, storedBatchDate, note ?? '']
+    );
+
+    res.json({
+      uploadId: result.rows[0].upload_id,
+      batchNumber: result.rows[0].batch_number || 'Unspecified',
+      batchDate: result.rows[0].batch_date,
+      note: result.rows[0].note ?? '',
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

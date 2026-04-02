@@ -32,6 +32,43 @@ const formatTimestamp = (raw) => {
   return new Date().toISOString();
 };
 
+const formatBatchDate = (rawTimestamp) => formatTimestamp(rawTimestamp).slice(0, 10);
+
+const summarizeBatchDateWarnings = (rows) => {
+  const batchDates = new Map();
+
+  rows.forEach((row) => {
+    const timestamp = row.timestamp_iso8601?.trim();
+    const batchNumber = parseBatch(row.batch_number ?? row.batch);
+
+    if (!timestamp || !batchNumber) return;
+
+    if (!batchDates.has(batchNumber)) {
+      batchDates.set(batchNumber, new Set());
+    }
+
+    batchDates.get(batchNumber).add(formatBatchDate(timestamp));
+  });
+
+  return Array.from(batchDates.entries())
+    .filter(([, dates]) => dates.size > 1)
+    .sort(([batchA], [batchB]) => {
+      const aNum = Number(batchA);
+      const bNum = Number(batchB);
+      const aIsNumeric = Number.isFinite(aNum);
+      const bIsNumeric = Number.isFinite(bNum);
+
+      if (aIsNumeric && bIsNumeric) return aNum - bNum;
+      if (aIsNumeric) return -1;
+      if (bIsNumeric) return 1;
+      return batchA.localeCompare(batchB, undefined, { numeric: true, sensitivity: 'base' });
+    })
+    .map(([batchNumber, dates]) => ({
+      batchNumber,
+      dates: Array.from(dates).sort(),
+    }));
+};
+
 // GET /api/uploads
 router.get('/', async (req, res, next) => {
   try {
@@ -61,6 +98,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
         const firstRow = results[0];
         const deviceType = firstRow.device_type;
         const fileTimestamp = formatTimestamp(firstRow.timestamp_iso8601);
+        const batchWarnings = summarizeBatchDateWarnings(results);
         
         await client.query('BEGIN');
 
@@ -141,7 +179,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
               irradiance_860nm_near_infrared_wavelength_nm, irradiance_860nm_near_infrared_wavelength_uncertainty_nm,
               irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared, irradiance_860nm_near_infrared_irradiance_uncertainty_uW_per_cm_squared,
 
-              range_m, range_uncertainty_m
+              range_m, range_uncertainty_m, batch_number
             ) VALUES (
               $1, $2, $3,
               $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
@@ -149,7 +187,7 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
               $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
               $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49,
               $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61,
-              $62, $63
+              $62, $63, $64
             )`,
             [
               uploadId, deviceId, formatTimestamp(row.timestamp_iso8601),
@@ -196,12 +234,16 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
               row.irradiance_860nm_near_infrared_wavelength_nm, row.irradiance_860nm_near_infrared_wavelength_uncertainty_nm,
               row.irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared, row.irradiance_860nm_near_infrared_irradiance_uncertainty_uW_per_cm_squared,
 
-              row.range_m, row.range_uncertainty_m
+              row.range_m, row.range_uncertainty_m, row.batch_number || row.batch || null
             ]);
         }
 
         await client.query('COMMIT');
-        res.status(201).json({ message: 'Upload success', rows: results.length });
+        res.status(201).json({
+          message: 'Upload success',
+          rows: results.length,
+          batchWarnings,
+        });
 
       } catch (err) {
         await client.query('ROLLBACK');
@@ -218,6 +260,13 @@ const parseVal = (val) => {
   if (val === undefined || val === null || val === '--' || val === '') return null;
   const parsed = parseFloat(val);
   return isNaN(parsed) ? null : parsed;
+};
+
+const parseBatch = (val) => {
+  if (val === undefined || val === null) return null;
+  const normalized = `${val}`.trim();
+  if (normalized === '' || normalized === '--') return null;
+  return normalized;
 };
 
 // POST /api/uploads/live/start - Start a new live session
@@ -293,6 +342,7 @@ router.post('/live/data', async (req, res, next) => {
       upload_id: sessionId,
       device_id: deviceId,
       timestamp_iso8601: timestamp,
+      batch_number: parseBatch(liveData.batch_number ?? liveData.batch),
       
       // Environmental sensors
       surface_temperature_C: parseVal(liveData.surface_temp),
@@ -372,7 +422,17 @@ router.post('/live/end', async (req, res, next) => {
 router.get('/:id/data', async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM data WHERE upload_id = $1 ORDER BY timestamp_iso8601 ASC',
+      `SELECT
+         d.*,
+         (d.timestamp_iso8601 AT TIME ZONE 'UTC')::date AS batch_date,
+         COALESCE(bn.note, '') AS note
+       FROM data d
+       LEFT JOIN batch_notes bn
+         ON bn.upload_id = d.upload_id
+        AND bn.batch_number = COALESCE(NULLIF(BTRIM(d.batch_number), ''), '')
+        AND bn.batch_date = (d.timestamp_iso8601 AT TIME ZONE 'UTC')::date
+       WHERE d.upload_id = $1
+       ORDER BY d.timestamp_iso8601 ASC`,
       [req.params.id]
     );
     res.json(result.rows);

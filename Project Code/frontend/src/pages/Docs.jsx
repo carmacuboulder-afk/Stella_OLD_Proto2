@@ -1,10 +1,40 @@
 import "../css/Docs.css";
+import "katex/dist/katex.min.css";
 import Demo from "../img/placeholder-vid.mov";
-import placeholder from "../img/placeholder.jpg"
+import placeholder from "../img/placeholder.jpg";
+import { BlockMath } from "react-katex";
 
 
 
 export default function Docs() {
+  const formulas = [
+    {
+      title: "Reflectance",
+      expression: "R_{\\lambda} = \\left(\\frac{I_{subject}}{I_{reference}}\\right) \\cdot C",
+      description: "Reflectance tracks how much incoming light a surface reflects compared with a reference material. Higher values mean the surface is reflecting more of that wavelength; lower values mean it is absorbing more."
+    },
+    {
+      title: "NDVI",
+      expression: "NDVI = \\frac{R_{NIR} - R_{RED}}{R_{NIR} + R_{RED}}",
+      description: "Normalized Difference Vegetation Index tracks vegetation density and health. Values near 1 usually indicate dense, healthy vegetation, values around 0 often indicate soil or non-living surfaces, and negative values often point to water."
+    },
+    {
+      title: "SR",
+      expression: "SR = \\frac{R_{NIR}}{R_{RED}}",
+      description: "Simple Ratio tracks vegetation vigor by comparing near-infrared reflectance to red reflectance. Higher values generally suggest healthier or denser vegetation, while lower values suggest sparse or stressed cover."
+    },
+    {
+      title: "DSWI 4",
+      expression: "DSWI_4 = \\frac{R_{NIR} - R_{GREEN}}{R_{RED} + R_{GREEN}}",
+      description: "Disease-Water Stress Index 4 tracks plant water stress. Lower or shifting values can indicate reduced water content or plant stress, while steadier values generally suggest less water stress."
+    },
+    {
+      title: "NIRv",
+      expression: "NIRv = NDVI \\cdot R_{NIR}",
+      description: "Near-Infrared Reflectance of Vegetation tracks the portion of the near-infrared signal linked to vegetation. Higher values usually indicate stronger vegetation presence or productivity, especially in areas with patchy plant cover."
+    },
+  ];
+
   return (
     <main className="doc">
         <div className="doc-content">
@@ -52,12 +82,37 @@ export default function Docs() {
             </ul>
             { /*graphing & analysing*/ }
             <h2 className="title">Graph & Analyze Your Data: </h2>
-            <ul>
-                <li>How to select parameters (NDVI, SR, Reflectance)</li>
-                <li>How NDVI is calculated</li>
-                <li>How to download results</li>
-                <li>Example graphs or step-by-step instructions</li>
+            <ul style={{ marginBottom: "6px" }}>
+                <li>Raw Data uses irradiance measured directly by STELLA, reported in uW/cm².</li>
+                <li>Reflectance and vegetation-index formulas are rendered below so they stay sharp and readable at any size.</li>
+                <li>You can manually choose which wavelengths are treated as RED and NIR in the Data Viewer. STELLA defaults are RED = 680nm and NIR = 810nm; a common research pairing is RED = 650nm and NIR = 860nm.</li>
+                <li>The Data Viewer now focuses on the charts themselves, while the interpretation guide for each formula lives here in the docs.</li>
             </ul>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "0" }}>
+                {formulas.map((formula) => (
+                    <div
+                        key={formula.title}
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px"
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: "100%",
+                                maxWidth: "520px",
+                                padding: "4px 0",
+                                display: "flex",
+                                justifyContent: "flex-start"
+                            }}
+                        >
+                            <BlockMath math={formula.expression} />
+                        </div>
+                        <p style={{ margin: 0, maxWidth: "760px", lineHeight: 1.45 }}>{formula.description}</p>
+                    </div>
+                ))}
+            </div>
 
 
 
@@ -80,5 +135,3 @@ export default function Docs() {
     </main>
   );
 }
-
-
