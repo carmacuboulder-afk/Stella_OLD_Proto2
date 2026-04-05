@@ -91,6 +91,8 @@ export default function Docs() {
                 For additional guidance, refer to the example graphs or step-by-step instructions provided below.
             </p>
 
+            <br></br>
+
             <ul style={{ marginBottom: "6px" }}>
                 <li>Raw Data uses irradiance measured directly by STELLA, reported in uW/cm².</li>
                 <li>Reflectance and vegetation-index formulas are rendered below so they stay sharp and readable at any size.</li>
