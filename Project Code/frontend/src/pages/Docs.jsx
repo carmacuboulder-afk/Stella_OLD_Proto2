@@ -81,8 +81,6 @@ export default function Docs() {
             <p>
             Use the map to explore and interact with your data. Click and drag to move around the map, and use the zoom controls or scroll to zoom in and out. 
             You can toggle different datasets on or off to focus on specific readings. Hover over markers to view key details such as coordinates, timestamps, device ID, and notes. 
-            Marker colors represent different data types or values, helping you quickly identify patterns. 
-            Refer to the example image below to see how your data will appear on the map.
             </p>
             { /*graphing & analysing*/ }
             <h2 className="title">Graph & Analyze Your Data: </h2>
@@ -124,7 +122,6 @@ export default function Docs() {
                     </div>
                 ))}
             </div>
-
 
         </div>
         <div className="doc-image">
