@@ -67,7 +67,8 @@ export default function Docs() {
             <p className="note">*More information on how to use the STELLA device <a href="https://science.gsfc.nasa.gov/stella/instruments/spectral/stella-1-1/stella-1-1-quickstart-guide/" target="_blank" rel="noopener noreferrer">here</a></p>
 
             { /*upload data*/ }
-            <h2 className="title">Uploading Data: </h2> <p className="note">*Make sure you are logged in to use this feature.</p><ul>
+            <h2 className="title">Uploading Data: </h2> <p className="note">*Make sure you are logged in to use this feature.</p>
+            <ul>
                 <li>Insert the SD card into your computer and select your data file.</li>
                 <li>On the Upload page, choose your CSV file.</li>
                 <li>Upload the file.</li>
@@ -77,14 +78,21 @@ export default function Docs() {
 
             { /*view map and data*/ }
             <h2 className="title">View Data on the Map: </h2>
-            <ul>
-                <li>How to navigate, zoom, and toggle data</li>
-                <li>Hovering for coordinates, timestamps, and notes</li>
-                <li>Color meaning</li>
-                <li>Example image of a dataset on the map</li>
-            </ul>
+            <p>
+            Use the map to explore and interact with your data. Click and drag to move around the map, and use the zoom controls or scroll to zoom in and out. 
+            You can toggle different datasets on or off to focus on specific readings. Hover over markers to view key details such as coordinates, timestamps, device ID, and notes. 
+            Marker colors represent different data types or values, helping you quickly identify patterns. 
+            Refer to the example image below to see how your data will appear on the map.
+            </p>
             { /*graphing & analysing*/ }
             <h2 className="title">Graph & Analyze Your Data: </h2>
+            <p>
+                To analyze your data, start by selecting the parameters you want to explore, such as NDVI, SR, or Reflectance. 
+                Once selected, the system will generate graphs to help you visualize patterns and trends in your data. NDVI vals range from -1 to 1 and are commonly used to indicate vegetation health. 
+                After reviewing your results, you can download the data or graphs for further analysis. 
+                For additional guidance, refer to the example graphs or step-by-step instructions provided below.
+            </p>
+
             <ul style={{ marginBottom: "6px" }}>
                 <li>Raw Data uses irradiance measured directly by STELLA, reported in uW/cm².</li>
                 <li>Reflectance and vegetation-index formulas are rendered below so they stay sharp and readable at any size.</li>
@@ -118,16 +126,16 @@ export default function Docs() {
             </div>
 
 
-
         </div>
         <div className="doc-image">
             { /*tutorial video*/}
-            <video className="video" controls>
-            <source src={Demo} type="video/mp4"/>
-            Your browser does not support the video tag.
-            </video>
+            <div className="video-container">
+            <iframe src="https://drive.google.com/file/d/1i_qOrx1XCXYlwwKP6_1JXETk_tWzLAnq/preview" width="640" height="480"></iframe>
+            </div>
             <br></br>
-            <p>Build Tutorial Videos: Step-by-step walkthroughs for assembling and testing the device.</p>
+            <p>Build Tutorial Videos Video 1: Step-by-step walkthroughs for assembling the STELLA 1.1 device.
+                View more videos <a href="https://drive.google.com/drive/u/2/folders/12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8?ths=true&q=sharedwith:public%20parent:12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8" target="_blank" rel="noopener noreferrer">here</a>
+            </p>
             { /*example images*/ }
             <img src={placeholder}/>
             <img src={placeholder}/>
