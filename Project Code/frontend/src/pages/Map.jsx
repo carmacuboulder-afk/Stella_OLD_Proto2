@@ -136,6 +136,11 @@ export default function Map() {
   const boulderLat = 40.0190
   const boulderLong = -105.2747
 
+//   const isValidLat = inputLat >= -90 && inputLat <= 90
+//   const isValidLng = inputLng >= -180 && inputLng <= 180
+  const isValidLat = inputLat >= -90 && inputLat <= 90 && !isNaN(inputLat);
+  const isValidLng = inputLng >= -180 && inputLng <= 180 && !isNaN(inputLng);
+
   return (
     /* MAP */
     <div class="mapDiv">
@@ -170,7 +175,6 @@ export default function Map() {
             }}
         />
 
-
         <input
             type="number"
             placeholder="Longitude"
@@ -187,9 +191,14 @@ export default function Map() {
 
 
         <button
+            disabled = {!isValidLat || !isValidLng}
             onClick={() => {
-                setSearchLat(parseFloat(inputLat));
-                setSearchLng(parseFloat(inputLng));
+                const newLat = parseFloat(inputLat);
+                const newLng = parseFloat(inputLng);
+                if (isValidLat && isValidLng) {
+                    setSearchLat(newLat);
+                    setSearchLng(newLng);
+                }
             }}
             style={{
                 backgroundColor: "white",
