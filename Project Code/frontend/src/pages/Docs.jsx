@@ -42,31 +42,35 @@ export default function Docs() {
             <p> New to STELLA? Start by assembling your device, collecting your first dataset, and uploading it to the Data Viewer for visualization.</p>
             <p className="overview">Overview: Build → Collect → Upload → Visualize → Analyze</p>
             { /*build*/ }
-            <h2 className="title">Build: </h2>
-            <h3>What you need:</h3>
-            <ul> 
-                <li>Loren ipsum dolor sit amet</li>
-                <li>Consectetur adipiscing elit</li>
-                <li>Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua</li>
-            </ul>
-            <h3>Instruction:</h3>
-            <p><a href="https://science.gsfc.nasa.gov/stella/" target="_blank" rel="noopener noreferrer" >STELLA 1.1 Schematic:</a> 
-                Visual reference of all circuit connections and components.</p>
-            <p><a href="https://drive.google.com/drive/folders/12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8?usp=drive_link" target="_blank" rel="noopener noreferrer" >Build Tutorial Videos:</a> 
-                Step-by-step walkthroughs for assembling and testing the device.</p>
+            <h2 className="title">Build:</h2>
+
+            <p>To build your own STELLA device, download the <a href="https://science.gsfc.nasa.gov/stella/downloads/" target="_blank" rel="noopener noreferrer"> required files </a> 
+            and follow the step-by-step build instructions.</p>
+
+            <p><a href="https://drive.google.com/drive/folders/12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8?usp=drive_link" target="_blank" rel="noopener noreferrer"> Build Tutorial Videos: </a> 
+            Step-by-step walkthroughs to guide you through assembling and testing the STELLA 1.1 device.</p>
+
+            <p><a href="https://science.gsfc.nasa.gov/stella/" target="_blank" rel="noopener noreferrer">Learn more about STELLA: </a> 
+            Visit the official NASA STELLA page for additional details and resources.</p>
+            
             {/* COLLECT */}
             <h2 className="title">Collect Measurements</h2>
             <ul>
-                <li>Power on STELLA and wait for the device to finish booting.</li>
-                <li>Point the sensor at your target (canopy, soil, calibration panel).</li>
-                <li>Trigger a measurement using the button or interface specified in the build guide.</li>
-                <li>Data is saved to the SD card (and may include GPS, date, and time).</li>
+                <li><strong>Prepare for data collection:</strong> Make sure the device is charged, the time is set correctly, and gather any necessary materials (e.g., notebook, camera).</li>
+                <li><strong>Insert the microSD card:</strong> Insert the card into the back of the device until it clicks. A flashing red light indicates the device is on and the card is properly inserted.</li>
+                <li><strong>Power on the device:</strong> Press and release the power button. Wait for the welcome screen to load and the instrument table to appear.</li>
+                <li><strong>Select sampling mode:</strong> Choose your data collection method by tapping the corresponding colored circle on the touchscreen.</li>
+                <li><strong>Position the device:</strong> Hold STELLA horizontally a few inches above the target surface for accurate measurements.</li>
+                <p><strong>Note:</strong> STELLA has a 40° field of view (FoV), so the measurement area increases with distance from the target.</p>
+
             </ul>
+            <p className="note">*More information on how to use the STELLA device <a href="https://science.gsfc.nasa.gov/stella/instruments/spectral/stella-1-1/stella-1-1-quickstart-guide/" target="_blank" rel="noopener noreferrer">here</a></p>
+
             { /*upload data*/ }
-            <h2 className="title">Uploading Data: </h2>
+            <h2 className="title">Uploading Data: </h2> <p className="note">*Make sure you are logged in to use this feature.</p>
             <ul>
                 <li>Insert the SD card into your computer and select your data file.</li>
-                <li>On the Upload page, choose your STELLA version (1.1 or 1.2).</li>
+                <li>On the Upload page, choose your CSV file.</li>
                 <li>Upload the file.</li>
                 <li>If your dataset doesn’t include GPS, you can manually enter coordinates.</li>
             </ul>
@@ -74,14 +78,21 @@ export default function Docs() {
 
             { /*view map and data*/ }
             <h2 className="title">View Data on the Map: </h2>
-            <ul>
-                <li>How to navigate, zoom, and toggle data</li>
-                <li>Hovering for coordinates, timestamps, and notes</li>
-                <li>Color meaning</li>
-                <li>Example image of a dataset on the map</li>
-            </ul>
+            <p>
+            Use the map to explore and interact with your data. Click and drag to move around the map, and use the zoom controls or scroll to zoom in and out. 
+            You can toggle different datasets on or off to focus on specific readings. Hover over markers to view key details such as coordinates, timestamps, device ID, and notes. 
+            </p>
             { /*graphing & analysing*/ }
             <h2 className="title">Graph & Analyze Your Data: </h2>
+            <p>
+                To analyze your data, start by selecting the parameters you want to explore, such as NDVI, SR, or Reflectance. 
+                Once selected, the system will generate graphs to help you visualize patterns and trends in your data. NDVI vals range from -1 to 1 and are commonly used to indicate vegetation health. 
+                After reviewing your results, you can download the data or graphs for further analysis. 
+                For additional guidance, refer to the example graphs or step-by-step instructions provided below.
+            </p>
+
+            <br></br>
+
             <ul style={{ marginBottom: "6px" }}>
                 <li>Raw Data uses irradiance measured directly by STELLA, reported in uW/cm².</li>
                 <li>Reflectance and vegetation-index formulas are rendered below so they stay sharp and readable at any size.</li>
@@ -114,17 +125,16 @@ export default function Docs() {
                 ))}
             </div>
 
-
-
         </div>
         <div className="doc-image">
             { /*tutorial video*/}
-            <video className="video" controls>
-            <source src={Demo} type="video/mp4"/>
-            Your browser does not support the video tag.
-            </video>
+            <div className="video-container">
+            <iframe src="https://drive.google.com/file/d/1i_qOrx1XCXYlwwKP6_1JXETk_tWzLAnq/preview" width="640" height="480"></iframe>
+            </div>
             <br></br>
-            <p>Build Tutorial Videos: Step-by-step walkthroughs for assembling and testing the device.</p>
+            <p>Build Tutorial Videos Video 1: Step-by-step walkthroughs for assembling the STELLA 1.1 device.
+                View more videos <a href="https://drive.google.com/drive/u/2/folders/12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8?ths=true&q=sharedwith:public%20parent:12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8" target="_blank" rel="noopener noreferrer">here</a>
+            </p>
             { /*example images*/ }
             <img src={placeholder}/>
             <img src={placeholder}/>
