@@ -290,7 +290,7 @@ export default function Data() {
   const timeSeriesGraphConfigurations = [
     {
       key: "raw_visible_over_time",
-      title: "Raw Visible Spectrum Over Time",
+      title: "Raw Visible Spectrum",
       subtitle: "Batch measurements across visible wavelengths over time.",
       yAxisLabel: "Measurement Magnitude (uW/cm²)",
       lines: [
@@ -305,7 +305,7 @@ export default function Data() {
     },
     {
       key: "raw_infrared_over_time",
-      title: "Raw Infrared Spectrum Over Time",
+      title: "Raw Infrared Spectrum",
       subtitle: "Batch measurements across infrared wavelengths over time.",
       yAxisLabel: "Measurement Magnitude (uW/cm²)",
       lines: [
@@ -318,7 +318,7 @@ export default function Data() {
     },
     {
       key: "reflectance_over_time",
-      title: "Reflectance Over Time",
+      title: "Reflectance",
       subtitle: "Batch reflectance values across all wavelengths over time.",
       yAxisLabel: "Measurement Magnitude",
       lines: wavelengthBands.map((band) => ({
@@ -329,7 +329,7 @@ export default function Data() {
     },
     {
       key: "temperature_over_time",
-      title: "Temperature Over Time",
+      title: "Temperature",
       subtitle: "Air and surface temperature for the selected batch over time.",
       yAxisLabel: "Temperature (°C)",
       lines: [
@@ -341,25 +341,25 @@ export default function Data() {
   const vegetationIndexTimeSeriesConfigurations = [
     {
       key: "ndvi_over_time",
-      title: "NDVI Over Time",
+      title: "NDVI",
       yAxisLabel: "NDVI",
       lines: [{ dataKey: "ndvi", stroke: "#2E8B57", name: "NDVI" }],
     },
     {
       key: "sr_over_time",
-      title: "SR Over Time",
+      title: "SR",
       yAxisLabel: "SR",
       lines: [{ dataKey: "sr", stroke: "#1E90FF", name: "SR" }],
     },
     {
       key: "dswi4_over_time",
-      title: "DSWI 4 Over Time",
+      title: "DSWI 4",
       yAxisLabel: "DSWI 4",
       lines: [{ dataKey: "dswi4", stroke: "#A0522D", name: "DSWI 4" }],
     },
     {
       key: "nirv_over_time",
-      title: "NIRv Over Time",
+      title: "NIRv",
       yAxisLabel: "NIRv",
       lines: [{ dataKey: "nirv", stroke: "#800080", name: "NIRv" }],
     },
