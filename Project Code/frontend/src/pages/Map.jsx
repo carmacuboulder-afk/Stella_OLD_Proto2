@@ -18,11 +18,6 @@ const evaIcon = new Icon({
   iconSize: [32, 32]
 })
 
-// const isValidLat = inputLat >= -90 && inputLat <= 90
-// const isValidLng = inputLng >= -180 && inputLng <= 180
-const isValidLat = inputLat >= -90 && inputLat <= 90 && !isNaN(inputLat);
-const isValidLng = inputLng >= -180 && inputLng <= 180 && !isNaN(inputLng);
-
 let lat = 40.0190; // Boulder Latitude
 let long = -105.2747; // Boulder Longitude
 
@@ -88,6 +83,9 @@ export default function Map() {
   const [inputLng, setInputLng] = useState("");
   const [searchLat, setSearchLat] = useState(null);
   const [searchLng, setSearchLng] = useState(null);
+
+  const isValidLat = inputLat >= -90 && inputLat <= 90 && !isNaN(inputLat);
+  const isValidLng = inputLng >= -180 && inputLng <= 180 && !isNaN(inputLng);
 
   useEffect(() => {
     // Wait until we know if user is logged in.
