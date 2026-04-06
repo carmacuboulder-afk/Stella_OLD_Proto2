@@ -71,7 +71,7 @@ function Home() {
               in real time, and the page will fill in the metadata, environmental values, and spectral bands automatically.
             </p>
             <li>2. Manual File Upload</li>
-            <p>If you have data saved from an SD card or another source, you can upload the file manually. The viewer will process 
+            <p>If you have data saved from an SD card or another source, you can upload the file manually. Make sure you are logged in to use this feature. The viewer will process 
               the file and populate the same fields you would see during a live session. If your browser does not support the 
               Web Serial API, try using Google Chrome, Microsoft Edge, or the manual upload option.
             </p>
