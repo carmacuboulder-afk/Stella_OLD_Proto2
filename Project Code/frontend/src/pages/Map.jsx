@@ -18,6 +18,11 @@ const evaIcon = new Icon({
   iconSize: [32, 32]
 })
 
+// const isValidLat = inputLat >= -90 && inputLat <= 90
+// const isValidLng = inputLng >= -180 && inputLng <= 180
+const isValidLat = inputLat >= -90 && inputLat <= 90 && !isNaN(inputLat);
+const isValidLng = inputLng >= -180 && inputLng <= 180 && !isNaN(inputLng);
+
 let lat = 40.0190; // Boulder Latitude
 let long = -105.2747; // Boulder Longitude
 
@@ -216,9 +221,14 @@ export default function Map() {
             onChange={(e) => setInputLng(e.target.value)}
           />
           <button
+            disabled = {!isValidLat || !isValidLng}
             onClick={() => {
-                setSearchLat(parseFloat(inputLat));
-                setSearchLng(parseFloat(inputLng));
+                const newLat = parseFloat(inputLat);
+                const newLng = parseFloat(inputLng);
+                if (isValidLat && isValidLng) {
+                    setSearchLat(newLat);
+                    setSearchLng(newLng);
+                }
             }}
           >
           Go
