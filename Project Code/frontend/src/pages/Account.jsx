@@ -5,8 +5,13 @@ import { useNavigate } from "react-router-dom";
 function Account() {
     const [profile, setProfile] = useState(null);
     const [newSchool, setNewSchool] = useState("");
-    const [newOrg, setNewOrg] = useState("");
     const [toast, setToast] = useState(null);
+
+    // Org search state
+    const [orgSearch, setOrgSearch] = useState("");
+    const [orgResults, setOrgResults] = useState([]);
+    const [orgSearched, setOrgSearched] = useState(false);
+
     const nav = useNavigate();
 
     const showToast = (msg, type) => {
@@ -20,14 +25,10 @@ function Account() {
                 const response = await fetch("http://localhost:8000/api/users/me", {
                     credentials: "include",
                 });
-                if (!response.ok) {
-                    nav("/login");
-                    return;
-                }
+                if (!response.ok) { nav("/login"); return; }
                 const data = await response.json();
                 setProfile(data);
-            } 
-            catch (err) {
+            } catch (err) {
                 console.log(err);
                 nav("/login");
             }
@@ -50,40 +51,14 @@ function Account() {
                 schools: prev.schools.filter((s) => s !== school),
             }));
             showToast("School removed.", "success");
-        } 
-        catch (err) {
-            showToast(err.message, "failure");
-        }
-    };
-
-    const handleRemoveOrg = async (org) => {
-        try {
-            const response = await fetch("http://localhost:8000/api/users/remove/org", {
-                method: "DELETE",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ org }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || "Failed to remove organization");
-            setProfile((prev) => ({
-                ...prev,
-                orgs: prev.orgs.filter((o) => o !== org),
-            }));
-            showToast("Organization removed.", "success");
-        } 
-        catch (err) {
+        } catch (err) {
             showToast(err.message, "failure");
         }
     };
 
     const handleAddSchool = async (e) => {
         e.preventDefault();
-        
-        if (!newSchool.trim()) {
-            return;
-        }
-        
+        if (!newSchool.trim()) return;
         try {
             const response = await fetch("http://localhost:8000/api/users/add/school", {
                 method: "POST",
@@ -93,44 +68,47 @@ function Account() {
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Failed to add school");
-
             setProfile((prev) => ({
                 ...prev,
                 schools: [...(prev.schools || []), data.added],
             }));
             setNewSchool("");
             showToast("School added!", "success");
-        } 
-        catch (err) {
+        } catch (err) {
             showToast(err.message, "failure");
         }
     };
 
-    const handleAddOrg = async (e) => {
+    const handleOrgSearch = async (e) => {
         e.preventDefault();
-
-        if (!newOrg.trim()) {
-            return;
-        }
-
+        if (!orgSearch.trim()) return;
         try {
-            const response = await fetch("http://localhost:8000/api/users/add/org", {
+            const response = await fetch(
+                `http://localhost:8000/api/orgs/search?name=${encodeURIComponent(orgSearch.trim())}`,
+                { credentials: "include" }
+            );
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Search failed");
+            setOrgResults(data);
+            setOrgSearched(true);
+        } catch (err) {
+            showToast(err.message, "failure");
+        }
+    };
+
+    const handleRequestJoin = async (orgId) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/orgs/${orgId}/request`, {
                 method: "POST",
                 credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ org: newOrg.trim() }),
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || "Failed to add organization");
-
-            setProfile((prev) => ({
-                ...prev,
-                orgs: [...(prev.orgs || []), data.added],
-            }));
-            setNewOrg("");
-            showToast("Organization added!", "success");
-        } 
-        catch (err) {
+            if (!response.ok) throw new Error(data.error || "Failed to send request");
+            showToast("Join request sent!", "success");
+            setOrgResults([]);
+            setOrgSearch("");
+            setOrgSearched(false);
+        } catch (err) {
             showToast(err.message, "failure");
         }
     };
@@ -142,9 +120,7 @@ function Account() {
     return (
         <main className="account">
             {toast && (
-                <div className={`toast toast-${toast.type}`}>
-                    {toast.msg}
-                </div>
+                <div className={`toast toast-${toast.type}`}>{toast.msg}</div>
             )}
             <h1><b>Account</b></h1>
             <div className="account-container">
@@ -189,31 +165,63 @@ function Account() {
                     </form>
                 </div>
 
+                <hr className="divider" />
+
                 {/* Organizations */}
                 <div className="account-section">
                     <label>Organizations</label>
+
+                    {/* Current accepted memberships */}
                     <div className="tags-container">
                         {profile.orgs?.length > 0
-                            ? profile.orgs.map((o, i) => (
-                                <span className="tag" key={i}>
-                                    {o}
-                                    <button className="tag-remove" onClick={() => handleRemoveOrg(o)}>×</button>
-                                </span>
+                            ? profile.orgs.map((o) => (
+                                <span className="tag" key={o.id}>{o.name}</span>
                             ))
-                            : <span className="tag-empty">No organizations added yet</span>
+                            : <span className="tag-empty">No organizations yet</span>
                         }
                     </div>
-                    <form onSubmit={handleAddOrg} className="add-field-row">
+
+                    {/* Search & request to join */}
+                    <form onSubmit={handleOrgSearch} className="add-field-row" style={{ marginTop: "1rem" }}>
                         <input
                             className="input-container"
                             type="text"
-                            placeholder=" add an organization"
-                            value={newOrg}
-                            onChange={(e) => setNewOrg(e.target.value)}
+                            placeholder=" search for an organization"
+                            value={orgSearch}
+                            onChange={(e) => {
+                                setOrgSearch(e.target.value);
+                                if (orgSearched) setOrgSearched(false);
+                            }}
                         />
-                        <button className="submitButton" type="submit">Add</button>
+                        <button className="submitButton" type="submit">Search</button>
                     </form>
+
+                    {orgSearched && orgResults.length === 0 && (
+                        <p className="tag-empty">No organizations found.</p>
+                    )}
+
+                    {orgResults.length > 0 && (
+                        <div className="org-search-results">
+                            {orgResults.map((org) => (
+                                <div className="org-result-row" key={org.id}>
+                                    <div className="org-result-info">
+                                        <span className="org-result-name">{org.name}</span>
+                                        {org.description && (
+                                            <span className="org-result-desc">{org.description}</span>
+                                        )}
+                                        <span className="org-result-meta">
+                                            Owner: {org.owner_username} · {org.member_count} member{org.member_count !== 1 ? "s" : ""}
+                                        </span>
+                                    </div>
+                                    <button className="submitButton" onClick={() => handleRequestJoin(org.id)}>
+                                        Request to Join
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
+
             </div>
         </main>
     );

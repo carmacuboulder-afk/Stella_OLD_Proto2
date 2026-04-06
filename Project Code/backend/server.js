@@ -6,16 +6,15 @@ import cookieParser from 'cookie-parser';
 
 // Import Routes
 import usersRouter from './routes/users.js';
-import teamsRouter from './routes/teams.js';
-import teamMembersRouter from './routes/teamMembers.js';
 import devicesRouter from './routes/devices.js';
 import uploadsRouter from './routes/uploads.js';
 import dataRouter from './routes/data.js';
+import orgsRouter from './routes/orgs.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Allow JSON request
+// Allow JSON requests
 app.use(express.json());
 
 // Allow our app to call this API, allows setting of cookies
@@ -47,8 +46,7 @@ app.get('/api/health', async (req, res) => {
 
 // API Routes
 app.use('/api/users', usersRouter);
-app.use('/api/teams', teamsRouter);
-app.use('/api/team-members', teamMembersRouter);
+app.use('/api/orgs', orgsRouter);
 app.use('/api/devices', devicesRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/data', dataRouter);
@@ -57,7 +55,7 @@ app.use((req, res, next) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Error handeling
+// Error handling
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });

@@ -1,45 +1,33 @@
-import { React, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../css/navbar.css";
 import logo from "../img/stella_logo.PNG";
 
-
-export default function Navbar({loggedIn, setLoggedIn}) {
+export default function Navbar({ loggedIn, setLoggedIn, ownedOrgId, setOwnedOrgId }) {
   const nav = useNavigate();
 
-  // when logout button is clicked from navbar run this
-  const handleLogout = async() => {
+  const handleLogout = async () => {
     try {
       const response = await fetch("http://localhost:8000/api/users/logout", {
         method: "DELETE",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
-      
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Login failed");
-      }
-
-      // after logging out, redirect to login page
+      if (!response.ok) throw new Error(data.error || "Logout failed");
       setLoggedIn(false);
+      setOwnedOrgId(null);
       nav("/login");
-      return;
-    }
+    } 
     catch (err) {
       console.log(err);
     }
-  }
-
-  console.log("loggedIn: " + loggedIn);
+  };
 
   return (
     <nav className="navbar">
       <div className="navbar-left">
-        <a href="./"><img src={logo} alt="Stella logo" className="navbar-logo" /></a>
+        <a href="/"><img src={logo} alt="Stella logo" className="navbar-logo" /></a>
       </div>
-
       <div className="navbar-links">
         <Link to="/data">Data</Link>
         <Link to="/map">Map</Link>
@@ -57,6 +45,10 @@ export default function Navbar({loggedIn, setLoggedIn}) {
               <button className="account-btn">Account ▾</button>
               <div className="account-dropdown">
                 <Link to="/account">My Account</Link>
+                {ownedOrgId
+                  ? <Link to={`/orgs/${ownedOrgId}/manage`}>Manage Organization</Link>
+                  : <Link to="/orgs/create">Create Organization</Link>
+                }
                 <button onClick={handleLogout} className="logout-button">Logout</button>
               </div>
             </div>

@@ -3,7 +3,6 @@ import backgroundImg from "../img/background.jpg";
 import StellaDevice from "../img/stellaSpin.gif";
 import importData from "../img/import_data.png";
 import MaunalUpload from "../img/ManualUploadFile.png";
-import placeholder from "../img/placeholder.jpg";
 
 
 
