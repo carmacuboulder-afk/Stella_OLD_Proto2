@@ -261,6 +261,13 @@ const parseVal = (val) => {
   return isNaN(parsed) ? null : parsed;
 };
 
+const parseBatch = (val) => {
+  if (val === undefined || val === null) return null;
+  const normalized = `${val}`.trim();
+  if (normalized === '' || normalized === '--') return null;
+  return normalized;
+};
+
 // POST /api/uploads/live/start
 router.post('/live/start', async (req, res, next) => {
   const { device_type, software_version } = req.body;
