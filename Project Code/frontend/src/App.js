@@ -30,6 +30,7 @@ export default App; */
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { UserProvider } from "./userContext";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Data from "./pages/Data";
@@ -75,21 +76,23 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <Navbar loggedIn={loggedIn} setLoggedIn={setLoggedIn}/>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/data" element={<Data />} />
-        <Route path="/map" element={<Map />} />
-        <Route path="/faq" element={<FAQ />} />
-        <Route path="/docs" element={<Docs />} />
-        <Route path="/login" element={<Login setLoggedIn={setLoggedIn}/>} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/account" element={<Account />} />
-      </Routes>
-      <Footer></Footer>
-    </Router>
+    <UserProvider>
+      <Router>
+        <Navbar loggedIn={loggedIn} setLoggedIn={setLoggedIn}/>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/data" element={<Data />} />
+          <Route path="/map" element={<Map />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/docs" element={<Docs />} />
+          <Route path="/login" element={<Login setLoggedIn={setLoggedIn}/>} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/account" element={<Account />} />
+        </Routes>
+        <Footer></Footer>
+      </Router>
+    </UserProvider>
   );
 }
 

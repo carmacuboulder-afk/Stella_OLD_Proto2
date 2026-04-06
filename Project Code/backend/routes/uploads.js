@@ -79,6 +79,23 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// GET /api/uploads/public
+router.get('/public', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM uploads
+       WHERE is_public = true
+       ORDER BY created_at DESC`
+    );
+
+    res.json(result.rows);
+  } 
+  catch(err) {
+    alert("Could not fetch public STELLA data.");
+    next(err);
+  }
+});
+
 // POST /api/uploads/csv
 router.post('/csv', upload.single('file'), async (req, res, next) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });

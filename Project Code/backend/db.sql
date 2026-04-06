@@ -6,6 +6,8 @@ CREATE TABLE users (
   role VARCHAR(20) NOT NULL DEFAULT 'user'
     CHECK (role IN ('user', 'admin')),
   password_hash VARCHAR(255) NOT NULL,
+  latitude NUMERIC(9,6),
+  longitude NUMERIC(9,6),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -79,8 +81,6 @@ CREATE TABLE uploads (
   is_public BOOLEAN NOT NULL DEFAULT FALSE,
   device_id INT NOT NULL,
   upload_name VARCHAR(255) NOT NULL,
-  latitude NUMERIC(9,6),
-  longitude NUMERIC(9,6),
   location_label VARCHAR(255),
   weekday VARCHAR(10),
   timestamp_iso8601 TIMESTAMPTZ NOT NULL,
@@ -169,6 +169,8 @@ CREATE TABLE data (
   batch_number VARCHAR(64),
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  latitude NUMERIC(9,6),
+  longitude NUMERIC(9,6),
   timestamp_iso8601 TIMESTAMPTZ NOT NULL
 );
 

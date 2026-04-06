@@ -11,76 +11,127 @@
 
 /* Sizing of map container */
 .leaflet-container {
-    height: 80vh;
-    margin-top: 3%;
-    margin-left: 4%;
-    margin-right: 4%;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    height: 85vh;
+    z-index: 50;
 }
 
-#missingDataButton {
+.mapContainer {
+    margin-left: 3em;
+    margin-right: 3em;
+}
+
+.mapBar {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    margin-top: .5em;
+    margin-bottom: .5em;
+}
+
+.mapButtons {
     position: absolute;
-    top: 100px;
-    right: 60px;
-    z-index: 1000;
-    width: 8em;
-    height: 2em;
+    right: 3em;
 }
 
 .mapButton {
-    display: flex;
-    justify-content: center;
-    font-weight: 500;
-    align-items: center;
     background-color: #FFFFFF;
     border: 1px solid #ccc;
-    border-radius: 7px;
-    transition: all ease 0.1s;
+    border-radius: 6px;
     box-shadow: 0px 5px 0px 0px #9cbc98;
+    font-weight: 400;
+    height: 2em;
+    margin-left: .5em;
+    position: relative;
+    transition: all ease 0.1s;
+    top: .3em;
+    width: 8em;
+    z-index: 75;
 }
 
 .mapButton:hover:not(:disabled) {
-    filter: brightness(1.05);
     cursor: pointer;
+    filter: brightness(1.05);
 }
 
 .mapButton:active {
-    transform: translateY(5px);
     box-shadow: 0px 0px 0px 0px #41dc8e;
+    transform: translateY(5px);
+}
+
+.mapSearchBar {
+    background: #9cbc98;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    margin: -0.75em 0em;
+    padding: .75em .75em;
+    transform: translateY(4.5rem);
+    z-index: 75;
+}
+
+.mapSearchBar input {
+    padding: .5em;
+    margin-right: .2em;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    width: 8em;
+    background: white;
+}
+
+.mapSearchBar button {
+    background-color: white;
+    color: #9cbc98;
+    border: 1px solid #ccc;
+    padding: .5em 1em;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.mapSearchBar button:hover {
+    filter: opacity(0.90);
+}
+
+.mapSearchBar button:active {
+    transform: scale(0.97);
 }
 
 .mapWindow {
-    position: absolute;
-    top: 10rem;
-    right: 5rem;
-    width: 20rem;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    box-shadow: 8px 8px 4px rgba(0,0,0,0.2);
     height: 40rem;
     overflow-y: auto;
-    background: white;
-    border-radius: 10px;
     padding: .75em;
-    z-index: 1000;
-    box-shadow: 8px 8px 4px rgba(0,0,0,0.2);
+    position: absolute;
+    right: 1rem;
+    top: 4rem;
+    width: 20rem;
+    z-index: 75;
 }
 
 .mapWindow h3 {
     font-weight: 600;
+    text-align: center;
 }
 
 .mapWindow button {
-    position: relative;
-    padding: .25em;
+    background-color: #9cbc98;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
     margin: .25em;
+    margin-right: .5em;
+    padding: .25em;
     padding-left: 1em;
     padding-right: 1em;
-    border-radius: 6px;
-    margin-right: .5em;
-    background-color: #9cbc98;
-    color: white;
+    position: relative;
 }
 
 .mapWindow button:hover {
-    filter: opacity(0.80);
-    cursor: pointer;
+    filter: opacity(0.90);
 }
 
 .mapWindow button:active {
@@ -88,37 +139,46 @@
 }
 
 .noCoordEntry {
-    margin-top: 1em;
-    padding: .75em;
-    background-color: white;
+    background-color: whitesmoke;
     border-radius: 8px;
-    border: 1px solid #ccc
+    border: 1px solid #ccc;
+    margin-top: 1em;
+    padding: .5em;
 }
 
 .noCoordEntry button {
     display: flex;
     justify-self: center;
+    margin-top: .75em;
 }
 
 .addCoordsForm {
-    margin-top: .5em;
-    position: relative;
+    text-align: center;
 }
 
 .addCoordsForm input {
-    margin-bottom: 1em;
-    padding-left: .5em;
     background-color: #ccc;
     border-radius: 4px;
+    margin-top: .5em;
+    padding-left: .5em;
 }
 
 .formButtons {
     display: flex;
     flex-direction: row;
+    justify-content: center;
 }
 
 #cancelButton {
     background-color: white;
+    border: 1px solid #ccc;
     color: black;
-    border: 2px solid #ccc;
+}
+
+#EVAButton {
+    width: 5em;
+}
+
+#publicDataButton {
+    width: 10em;
 }
