@@ -159,9 +159,21 @@ CREATE TABLE data (
 
   range_m NUMERIC(5,3),
   range_uncertainty_m NUMERIC(5,4),
+  batch_number VARCHAR(64),
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   timestamp_iso8601 TIMESTAMPTZ NOT NULL
+);
+
+-- BATCH NOTES
+CREATE TABLE batch_notes (
+  upload_id BIGINT NOT NULL,
+  batch_number VARCHAR(64) NOT NULL DEFAULT '',
+  batch_date DATE NOT NULL,
+  note VARCHAR(511) NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (upload_id, batch_number, batch_date)
 );
 
 -- Foreign Keys
@@ -178,6 +190,10 @@ ALTER TABLE data
   FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,
   ADD CONSTRAINT data_device_fk
   FOREIGN KEY (device_id) REFERENCES devices(id);
+
+ALTER TABLE batch_notes
+  ADD CONSTRAINT batch_notes_upload_fk
+  FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE;
 
 -- Indexes to speed up queries
 CREATE INDEX idx_uploads_user_id ON uploads(user_id);
