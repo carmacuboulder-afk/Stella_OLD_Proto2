@@ -181,28 +181,6 @@ function Account() {
                         }
                     </div>
 
-                    {/* Create org — only if user doesn't already own one */}
-                    {!profile.owned_org_id && (
-                        <button
-                            className="button"
-                            style={{ marginTop: "0.5rem" }}
-                            onClick={() => nav("/orgs/create")}
-                        >
-                            Create Organization
-                        </button>
-                    )}
-
-                    {/* Manage org — if user owns one */}
-                    {profile.owned_org_id && (
-                        <button
-                            className="button"
-                            style={{ marginTop: "0.5rem" }}
-                            onClick={() => nav(`/orgs/${profile.owned_org_id}/manage`)}
-                        >
-                            Manage My Organization
-                        </button>
-                    )}
-
                     {/* Search & request to join */}
                     <form onSubmit={handleOrgSearch} className="add-field-row" style={{ marginTop: "1rem" }}>
                         <input

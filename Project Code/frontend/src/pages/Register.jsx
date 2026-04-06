@@ -1,5 +1,5 @@
 import "../css/Register.css";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 
 function Register() {
@@ -11,18 +11,6 @@ function Register() {
     const [password_one, setPassword_One] = useState("");
     const [password_two, setPassword_Two] = useState("");
     const [school, setSchool] = useState("");
-
-    useEffect(() => {
-        const footer = document.getElementById("site-footer");
-        if (footer) {
-            footer.style.display = "none";
-        }
-        return () => {
-            if (footer) {
-                footer.style.display = "block";
-            }
-        };
-    }, []);
 
     const showToast = (msg, type) => {
         setToast({ msg, type });

@@ -1,4 +1,3 @@
-import React from "react";
 import "../css/FAQ.css"
 
 export default function FAQ() {
