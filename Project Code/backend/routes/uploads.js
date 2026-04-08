@@ -4,6 +4,13 @@ import pool from '../db.js';
 import multer from 'multer';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
+import { requireAuth } from '../middleware/auth.js';
+import {
+  assertOrganizationMembership,
+  getAccessibleUploadById,
+  getUploadPermissionsById,
+  normalizeOrgId,
+} from '../utils/uploadAccess.js';
 
 const router = Router();
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -11,6 +18,12 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE } 
+});
+
+const formatUploadForResponse = (upload) => ({
+  ...upload,
+  can_delete: Boolean(upload.can_delete),
+  can_remove_from_org: Boolean(upload.can_remove_from_org),
 });
 
 const formatTimestamp = (raw) => {
@@ -70,17 +83,45 @@ const summarizeBatchDateWarnings = (rows) => {
 };
 
 // GET /api/uploads
-router.get('/', async (req, res, next) => {
+router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const result = await pool.query('SELECT * FROM uploads ORDER BY created_at DESC');
-    res.json(result.rows);
+    const result = await pool.query(
+      `SELECT
+         u.id,
+         u.upload_name,
+         u.created_at,
+         u.timestamp_iso8601,
+         u.user_id,
+         u.org_id,
+         (u.user_id = $1) AS can_delete,
+         (u.org_id IS NOT NULL AND o.owner_user_id = $1) AS can_remove_from_org,
+         CASE WHEN u.org_id IS NULL THEN 'user' ELSE 'organization' END AS scope_type,
+         CASE WHEN u.org_id IS NULL THEN 'My Uploads' ELSE o.name END AS scope_label
+       FROM uploads u
+       LEFT JOIN organizations o ON o.id = u.org_id
+       WHERE
+         (u.org_id IS NULL AND u.user_id = $1)
+         OR EXISTS (
+           SELECT 1
+           FROM user_organizations uo
+           WHERE uo.organization_id = u.org_id
+             AND uo.user_id = $1
+             AND uo.status = 'accepted'
+         )
+       ORDER BY
+         CASE WHEN u.org_id IS NULL THEN 0 ELSE 1 END,
+         scope_label ASC,
+         u.created_at DESC`,
+      [req.user_id]
+    );
+    res.json(result.rows.map(formatUploadForResponse));
   } catch (err) {
     next(err);
   }
 });
 
 // POST /api/uploads/csv
-router.post('/csv', upload.single('file'), async (req, res, next) => {
+router.post('/csv', requireAuth, upload.single('file'), async (req, res, next) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const client = await pool.connect();
@@ -94,6 +135,13 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
     .on('end', async () => {
       try {
         if (results.length === 0) throw new Error("CSV is empty");
+
+        const orgId = normalizeOrgId(req.body.org_id);
+        const targetScope = await assertOrganizationMembership(req.user_id, orgId, client);
+
+        if (!targetScope.ok) {
+          return res.status(403).json({ error: 'Forbidden: organization access required' });
+        }
 
         const firstRow = results[0];
         const deviceType = firstRow.device_type;
@@ -118,14 +166,11 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
           deviceId = newDevice.rows[0].id;
         }
 
-        // TODO: integrate with real user id
-        const DEFAULT_USER_ID = 1; 
-        
         const uploadRes = await client.query(
           `INSERT INTO uploads (
             user_id, org_id, device_id, upload_name, timestamp_iso8601
-          ) VALUES ($1, NULL, $2, $3, $4) RETURNING id`,
-          [DEFAULT_USER_ID, deviceId, req.file.originalname, fileTimestamp]
+          ) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [req.user_id, targetScope.orgId, deviceId, req.file.originalname, fileTimestamp]
         );
         const uploadId = uploadRes.rows[0].id;
 
@@ -269,8 +314,8 @@ const parseBatch = (val) => {
 };
 
 // POST /api/uploads/live/start
-router.post('/live/start', async (req, res, next) => {
-  const { device_type, software_version } = req.body;
+router.post('/live/start', requireAuth, async (req, res, next) => {
+  const { device_type, software_version, org_id } = req.body;
 
   if (!device_type || !software_version) {
     return res.status(400).json({ error: 'Missing device_type or software_version' });
@@ -280,6 +325,12 @@ router.post('/live/start', async (req, res, next) => {
 
   try {
     await client.query('BEGIN');
+
+    const targetScope = await assertOrganizationMembership(req.user_id, org_id, client);
+    if (!targetScope.ok) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Forbidden: organization access required' });
+    }
 
     let deviceId;
     const deviceRes = await client.query(
@@ -297,15 +348,14 @@ router.post('/live/start', async (req, res, next) => {
       deviceId = newDevice.rows[0].id;
     }
 
-    const DEFAULT_USER_ID = 1;
     const timestamp = new Date().toISOString();
     const uploadName = `Live Session - ${new Date().toLocaleString()}`;
 
     const uploadRes = await client.query(
       `INSERT INTO uploads (
-        user_id, device_id, upload_name, timestamp_iso8601
-      ) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [DEFAULT_USER_ID, deviceId, uploadName, timestamp]
+        user_id, org_id, device_id, upload_name, timestamp_iso8601
+      ) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [req.user_id, targetScope.orgId, deviceId, uploadName, timestamp]
     );
 
     await client.query('COMMIT');
@@ -325,7 +375,7 @@ router.post('/live/start', async (req, res, next) => {
 });
 
 // POST /api/uploads/live/data
-router.post('/live/data', async (req, res, next) => {
+router.post('/live/data', requireAuth, async (req, res, next) => {
   const { sessionId, deviceId, ...liveData } = req.body;
 
   if (!sessionId || !deviceId) {
@@ -333,6 +383,11 @@ router.post('/live/data', async (req, res, next) => {
   }
 
   try {
+    const upload = await getAccessibleUploadById(sessionId, req.user_id);
+    if (!upload) {
+      return res.status(403).json({ error: 'Forbidden: upload access required' });
+    }
+
     const timestamp = new Date().toISOString();
 
     const dataRow = {
@@ -381,7 +436,7 @@ router.post('/live/data', async (req, res, next) => {
 });
 
 // POST /api/uploads/live/end
-router.post('/live/end', async (req, res, next) => {
+router.post('/live/end', requireAuth, async (req, res, next) => {
   const { sessionId } = req.body;
 
   if (!sessionId) {
@@ -389,6 +444,11 @@ router.post('/live/end', async (req, res, next) => {
   }
 
   try {
+    const upload = await getAccessibleUploadById(sessionId, req.user_id);
+    if (!upload) {
+      return res.status(403).json({ error: 'Forbidden: upload access required' });
+    }
+
     const countRes = await pool.query(
       'SELECT COUNT(*) as count FROM data WHERE upload_id = $1',
       [sessionId]
@@ -411,8 +471,13 @@ router.post('/live/end', async (req, res, next) => {
 });
 
 // GET /api/uploads/:id/data
-router.get('/:id/data', async (req, res, next) => {
+router.get('/:id/data', requireAuth, async (req, res, next) => {
   try {
+    const upload = await getAccessibleUploadById(req.params.id, req.user_id);
+    if (!upload) {
+      return res.status(404).json({ error: 'Upload not found' });
+    }
+
     const result = await pool.query(
       `SELECT
          d.*,
@@ -434,27 +499,115 @@ router.get('/:id/data', async (req, res, next) => {
 });
 
 // GET /api/uploads/:id
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', requireAuth, async (req, res, next) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM uploads WHERE id = $1',
-      [req.params.id]
-    );
-
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-
-    res.json(result.rows[0]);
+    const upload = await getUploadPermissionsById(req.params.id, req.user_id);
+    if (!upload?.can_access) return res.status(404).json({ error: 'Not found' });
+    res.json(formatUploadForResponse(upload));
   } catch (err) {
     next(err);
   }
 });
 
-// GET /api/uploads/user/:userId
-router.get('/user/:userId', async (req, res, next) => {
+router.delete('/:id', requireAuth, async (req, res, next) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
   try {
+    const upload = await getUploadPermissionsById(req.params.id, req.user_id, client);
+    if (!upload) return res.status(404).json({ error: 'Not found' });
+
+    if (!upload.can_delete) {
+      return res.status(403).json({ error: 'Forbidden: only the uploader can delete this upload' });
+    }
+
+    await client.query('BEGIN');
+    transactionStarted = true;
+    await client.query('DELETE FROM uploads WHERE id = $1', [req.params.id]);
+    await client.query('COMMIT');
+    transactionStarted = false;
+
+    res.json({
+      message: 'Upload deleted',
+      uploadId: upload.id,
+    });
+  } catch (err) {
+    if (transactionStarted) {
+      await client.query('ROLLBACK');
+    }
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+router.patch('/:id/remove-from-org', requireAuth, async (req, res, next) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
+
+  try {
+    const upload = await getUploadPermissionsById(req.params.id, req.user_id, client);
+    if (!upload) return res.status(404).json({ error: 'Not found' });
+
+    if (upload.org_id === null) {
+      return res.status(400).json({ error: 'Upload is already in personal scope' });
+    }
+
+    if (!upload.can_remove_from_org) {
+      return res.status(403).json({ error: 'Forbidden: only the organization owner can remove this upload from the organization' });
+    }
+
+    await client.query('BEGIN');
+    transactionStarted = true;
+    const updated = await client.query(
+      `UPDATE uploads
+       SET org_id = NULL
+       WHERE id = $1
+       RETURNING
+         id,
+         upload_name,
+         created_at,
+         timestamp_iso8601,
+         user_id,
+         org_id`,
+      [req.params.id]
+    );
+    await client.query('COMMIT');
+    transactionStarted = false;
+
+    res.json({
+      message: 'Upload removed from organization',
+      upload: {
+        ...updated.rows[0],
+        scope_type: 'user',
+        scope_label: 'My Uploads',
+        can_delete: Number(updated.rows[0].user_id) === Number(req.user_id),
+        can_remove_from_org: false,
+      },
+    });
+  } catch (err) {
+    if (transactionStarted) {
+      await client.query('ROLLBACK');
+    }
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/uploads/user/:userId
+router.get('/user/:userId', requireAuth, async (req, res, next) => {
+  try {
+    if (Number(req.params.userId) !== Number(req.user_id)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const result = await pool.query(
-      'SELECT * FROM uploads WHERE user_id = $1 ORDER BY created_at DESC',
-      [req.params.userId]
+      `SELECT *
+       FROM uploads
+       WHERE user_id = $1 AND org_id IS NULL
+       ORDER BY created_at DESC`,
+      [req.user_id]
     );
 
     res.json(result.rows || []);
