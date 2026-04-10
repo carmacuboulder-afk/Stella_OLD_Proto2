@@ -1,6 +1,8 @@
 // routes/data.js
 import { Router } from 'express';
 import pool from '../db.js';
+import { requireAuth } from '../middleware/auth.js';
+import { getAccessibleUploadById } from '../services/uploadAccess.js';
 
 const router = Router();
 
@@ -67,7 +69,7 @@ router.put('/:id/coordinates', async (req, res) => {
 });
 
 // PUT /api/data/batch-note
-router.put('/batch-note', async (req, res, next) => {
+router.put('/batch-note', requireAuth, async (req, res, next) => {
   const { uploadId, batchNumber, batchDate, note } = req.body;
   const normalizedBatchNumber = `${batchNumber ?? ''}`.trim();
   const storedBatchNumber = normalizedBatchNumber === 'Unspecified' ? '' : normalizedBatchNumber;
@@ -78,6 +80,11 @@ router.put('/batch-note', async (req, res, next) => {
   }
 
   try {
+    const upload = await getAccessibleUploadById(uploadId, req.user_id);
+    if (!upload) {
+      return res.status(404).json({ error: 'Upload not found' });
+    }
+
     const batchExists = await pool.query(
       `SELECT 1
        FROM data

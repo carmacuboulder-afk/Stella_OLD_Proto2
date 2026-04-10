@@ -147,7 +147,7 @@ export default function Map() {
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 1000,
-            background: "#9cbc98",
+            background: "#a0bc98",
             padding: "10px 14px",
             borderRadius: "10px",
             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
@@ -193,7 +193,7 @@ export default function Map() {
             }}
             style={{
                 backgroundColor: "white",
-                color: "#9cbc98",
+                color: "#a0bc98",
                 border: "none",
                 padding: "6px 14px",
                 borderRadius: "6px",
