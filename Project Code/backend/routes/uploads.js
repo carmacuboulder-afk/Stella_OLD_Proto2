@@ -10,7 +10,7 @@ import {
   getAccessibleUploadById,
   getUploadPermissionsById,
   normalizeOrgId,
-} from '../utils/uploadAccess.js';
+} from '../services/uploadAccess.js';
 
 const router = Router();
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -46,6 +46,16 @@ const formatTimestamp = (raw) => {
 };
 
 const formatBatchDate = (rawTimestamp) => formatTimestamp(rawTimestamp).slice(0, 10);
+
+const parseBoolean = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'on';
+  }
+  if (typeof value === 'number') return value === 1;
+  return false;
+};
 
 const summarizeBatchDateWarnings = (rows) => {
   const batchDates = new Map();
@@ -146,6 +156,7 @@ router.post('/csv', requireAuth, upload.single('file'), async (req, res, next) =
         const firstRow = results[0];
         const deviceType = firstRow.device_type;
         const fileTimestamp = formatTimestamp(firstRow.timestamp_iso8601);
+        const isPublic = parseBoolean(req.body.is_public);
         const batchWarnings = summarizeBatchDateWarnings(results);
         
         await client.query('BEGIN');
@@ -168,9 +179,9 @@ router.post('/csv', requireAuth, upload.single('file'), async (req, res, next) =
 
         const uploadRes = await client.query(
           `INSERT INTO uploads (
-            user_id, org_id, device_id, upload_name, timestamp_iso8601
-          ) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [req.user_id, targetScope.orgId, deviceId, req.file.originalname, fileTimestamp]
+            user_id, org_id, is_public, device_id, upload_name, timestamp_iso8601
+          ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          [req.user_id, targetScope.orgId, isPublic, deviceId, req.file.originalname, fileTimestamp]
         );
         const uploadId = uploadRes.rows[0].id;
 
@@ -223,7 +234,7 @@ router.post('/csv', requireAuth, upload.single('file'), async (req, res, next) =
               irradiance_860nm_near_infrared_wavelength_nm, irradiance_860nm_near_infrared_wavelength_uncertainty_nm,
               irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared, irradiance_860nm_near_infrared_irradiance_uncertainty_uW_per_cm_squared,
 
-              range_m, range_uncertainty_m, batch_number
+              range_m, range_uncertainty_m, batch_number, decimal_hour
             ) VALUES (
               $1, $2, $3,
               $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
@@ -231,7 +242,7 @@ router.post('/csv', requireAuth, upload.single('file'), async (req, res, next) =
               $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
               $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49,
               $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61,
-              $62, $63, $64
+              $62, $63, $64, $65
             )`,
             [
               uploadId, deviceId, formatTimestamp(row.timestamp_iso8601),
@@ -278,7 +289,8 @@ router.post('/csv', requireAuth, upload.single('file'), async (req, res, next) =
               row.irradiance_860nm_near_infrared_wavelength_nm, row.irradiance_860nm_near_infrared_wavelength_uncertainty_nm,
               row.irradiance_860nm_near_infrared_irradiance_uW_per_cm_squared, row.irradiance_860nm_near_infrared_irradiance_uncertainty_uW_per_cm_squared,
 
-              row.range_m, row.range_uncertainty_m, row.batch_number || row.batch || null
+              row.range_m, row.range_uncertainty_m, row.batch_number || row.batch || null,
+              parseVal(row.decimal_hour ?? row.dec_hour)
             ]);
         }
 
@@ -388,13 +400,16 @@ router.post('/live/data', requireAuth, async (req, res, next) => {
       return res.status(403).json({ error: 'Forbidden: upload access required' });
     }
 
-    const timestamp = new Date().toISOString();
+    const timestamp = formatTimestamp(
+      liveData.timestamp_iso8601 ?? liveData.timestamp ?? liveData.time
+    );
 
     const dataRow = {
       upload_id: sessionId,
       device_id: deviceId,
       timestamp_iso8601: timestamp,
       batch_number: parseBatch(liveData.batch_number ?? liveData.batch),
+      decimal_hour: parseVal(liveData.decimal_hour ?? liveData.dec_hour),
       
       surface_temperature_C: parseVal(liveData.surface_temp),
       air_temperature_C: parseVal(liveData.air_temp),

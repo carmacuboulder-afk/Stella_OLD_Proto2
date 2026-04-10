@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
-import { getAccessibleUploadById } from '../utils/uploadAccess.js';
+import { getAccessibleUploadById } from '../services/uploadAccess.js';
 
 const router = Router();
 

@@ -15,6 +15,7 @@ export default function Data() {
   const [graphData, setGraphData] = useState([]);
   const [loadingGraph, setLoadingGraph] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadPublic, setIsUploadPublic] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const [uploadActionState, setUploadActionState] = useState({ uploadId: null, action: null });
   const [isHistoryEditMode, setIsHistoryEditMode] = useState(false);
@@ -69,9 +70,11 @@ export default function Data() {
   // Use refs to track recording state and buffer for immediate access in callbacks
   const isRecordingRef = useRef(false);
   const recordingBufferRef = useRef([]);
+  const chartCardRefs = useRef({});
 
   const pointDotStyle = { r: 1.5, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
   const activePointDotStyle = { r: 2.5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
+  const uiAccentGreen = "#a0bc98";
   const formatNumberWithCommas = (value, maximumFractionDigits = 4) =>
     Number(value).toLocaleString('en-US', {
       minimumFractionDigits: 0,
@@ -158,6 +161,23 @@ export default function Data() {
       minute: '2-digit',
       second: '2-digit',
     });
+  };
+  const formatDecimalHourLabel = (decimalHour, fallbackDate = null) => {
+    const parsedDecimalHour = Number(decimalHour);
+
+    if (Number.isFinite(parsedDecimalHour)) {
+      const totalSeconds = Math.round(parsedDecimalHour * 60 * 60);
+      const normalizedSeconds = ((totalSeconds % 86400) + 86400) % 86400;
+      const hours = Math.floor(normalizedSeconds / 3600);
+      const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+      const seconds = normalizedSeconds % 60;
+      const meridiem = hours >= 12 ? 'PM' : 'AM';
+      const displayHour = hours % 12 || 12;
+
+      return `${displayHour}:${`${minutes}`.padStart(2, '0')}:${`${seconds}`.padStart(2, '0')} ${meridiem}`;
+    }
+
+    return fallbackDate ? formatTimeLabel(fallbackDate) : "--";
   };
   const normalizeBatchDate = (rawBatchDate, fallbackDate) => {
     const normalizedFallback = fallbackDate.toISOString().slice(0, 10);
@@ -249,6 +269,116 @@ export default function Data() {
 
     const padding = maxValue === 0 ? 1 : Math.max(Math.abs(maxValue) * 0.1, 0.1);
     return [Math.max(0, minValue - padding), maxValue + padding];
+  };
+  const setChartCardRef = (chartKey, element) => {
+    if (element) {
+      chartCardRefs.current[chartKey] = element;
+      return;
+    }
+
+    delete chartCardRefs.current[chartKey];
+  };
+  const sanitizeDownloadFileName = (value) => (
+    `${value || "chart"}`
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      || "chart"
+  );
+  const downloadChartAsPng = async (chartKey, chartTitle, fileLabel = chartTitle) => {
+    const chartCard = chartCardRefs.current[chartKey];
+    const chartSvg = chartCard?.querySelector("svg");
+
+    if (!chartSvg) {
+      window.alert("The graph is not ready to download yet.");
+      return;
+    }
+
+    const viewBox = chartSvg.viewBox?.baseVal;
+    const svgWidth = Number(chartSvg.getAttribute("width"));
+    const svgHeight = Number(chartSvg.getAttribute("height"));
+    const exportWidth = Math.max(
+      Math.round(
+        (viewBox?.width && Number.isFinite(viewBox.width) ? viewBox.width : 0)
+        || (Number.isFinite(svgWidth) ? svgWidth : 0)
+        || chartSvg.clientWidth
+        || 0
+      ),
+      800
+    );
+    const exportHeight = Math.max(
+      Math.round(
+        (viewBox?.height && Number.isFinite(viewBox.height) ? viewBox.height : 0)
+        || (Number.isFinite(svgHeight) ? svgHeight : 0)
+        || chartSvg.clientHeight
+        || 0
+      ),
+      500
+    );
+    const titleFontSize = 28;
+    const titlePaddingTop = 28;
+    const titleSpacing = 18;
+    const canvasWidth = exportWidth;
+    const canvasHeight = exportHeight + titleFontSize + titlePaddingTop + titleSpacing;
+    const serializedSvg = new XMLSerializer().serializeToString(chartSvg);
+    const svgMarkupWithNamespace = serializedSvg.includes("xmlns=")
+      ? serializedSvg
+      : serializedSvg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+    const svgMarkup = svgMarkupWithNamespace
+      .replace(/width="[^"]*"/, `width="${exportWidth}"`)
+      .replace(/height="[^"]*"/, `height="${exportHeight}"`);
+    const svgBlob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const image = new Image();
+
+    try {
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+        image.src = svgUrl;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvasWidth, canvasHeight);
+      context.fillStyle = "#111827";
+      context.font = `700 ${titleFontSize}px Arial, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "top";
+      context.fillText(chartTitle, canvasWidth / 2, titlePaddingTop, canvasWidth - 40);
+      context.drawImage(image, 0, titleFontSize + titlePaddingTop + titleSpacing, exportWidth, exportHeight);
+
+      const downloadLink = document.createElement("a");
+      downloadLink.href = canvas.toDataURL("image/png");
+      downloadLink.download = `${sanitizeDownloadFileName(fileLabel)}.png`;
+      downloadLink.click();
+    } catch (error) {
+      console.error("Failed to download chart", error);
+      window.alert("Couldn't download that graph. Please try again.");
+    } finally {
+      URL.revokeObjectURL(svgUrl);
+    }
+  };
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const downloadAllChartsAsPng = async () => {
+    const allChartConfigs = [
+      ...graphConfigurations,
+      ...timeSeriesGraphConfigurations,
+      ...vegetationIndexTimeSeriesConfigurations,
+    ];
+
+    for (const chartConfig of allChartConfigs) {
+      const fileLabel = selectedBatchLabel
+        ? `${chartConfig.title} ${selectedBatchLabel}`
+        : chartConfig.title;
+      await downloadChartAsPng(chartConfig.key, chartConfig.title, fileLabel);
+      await wait(150);
+    }
   };
 
   const availableBatches = Array.from(
@@ -443,7 +573,7 @@ export default function Data() {
       key: "user",
       title: "Personal",
       subtitle: "Your own uploads",
-      accent: "#0f9d58",
+      accent: uiAccentGreen,
       count: uploads.filter((upload) => buildScopeKey(upload) === "user").length,
     },
     ...accessibleOrgs.map((org, index) => {
@@ -452,7 +582,7 @@ export default function Data() {
         key,
         title: org.name,
         subtitle: "Organization data",
-        accent: "#0f9d58",
+        accent: uiAccentGreen,
         count: uploads.filter((upload) => buildScopeKey(upload) === key).length,
       };
     }),
@@ -756,7 +886,16 @@ export default function Data() {
       }
       
       // Sort by timestamp to ensure correct order
-      const sorted = data.sort((a, b) => new Date(a.timestamp_iso8601) - new Date(b.timestamp_iso8601));
+      const sorted = data.sort((a, b) => {
+        const aDecimalHour = parseOptionalNumber(a.decimal_hour ?? a.dec_hour);
+        const bDecimalHour = parseOptionalNumber(b.decimal_hour ?? b.dec_hour);
+
+        if (aDecimalHour !== null && bDecimalHour !== null && aDecimalHour !== bDecimalHour) {
+          return aDecimalHour - bDecimalHour;
+        }
+
+        return new Date(a.timestamp_iso8601) - new Date(b.timestamp_iso8601);
+      });
       
       const formatted = sorted.map((row, index) => {
         const date = new Date(row.timestamp_iso8601);
@@ -781,12 +920,13 @@ export default function Data() {
           id: index,
           dataPointId: row.id,
           timestamp: row.timestamp_iso8601,
+          decimalHour: parseOptionalNumber(row.decimal_hour ?? row.dec_hour),
           batchNumber,
           batchDate,
           batchKey,
           batchLabel: buildBatchLabel(batchNumber, batchDate),
           note: row.note || "",
-          timeLabel: formatTimeLabel(date),
+          timeLabel: formatDecimalHourLabel(row.decimal_hour ?? row.dec_hour, date),
           // Temperature (try both uppercase and lowercase column names from postgres)
           surface_temp: parseOptionalNumber(row.surface_temperature_c ?? row.surface_temperature_C),
           air_temp: parseOptionalNumber(row.air_temperature_c ?? row.air_temperature_C),
@@ -995,6 +1135,7 @@ export default function Data() {
     }
     const formData = new FormData();
     formData.append("file", selectedFile);
+    formData.append("is_public", isUploadPublic ? "true" : "false");
     if (destination.orgId !== null) {
       formData.append("org_id", `${destination.orgId}`);
     }
@@ -1017,6 +1158,7 @@ export default function Data() {
           `Success! Processed ${data.rows || 0} rows.${hasBatchWarnings ? ' Duplicate batch numbers were split by date in the viewer.' : ''}`
         );
         setSelectedFile(null);
+        setIsUploadPublic(false);
         fetchUploads();
       } else {
         setUploadStatus(`Error: ${data.error}`);
@@ -1292,6 +1434,10 @@ export default function Data() {
         }
       }
 
+      if ((newData.dec_hour === undefined || newData.dec_hour === "") && newData.decimal_hour !== undefined) {
+        newData.dec_hour = newData.decimal_hour;
+      }
+
       // Store device info when we see it
       if (newData.device_type && newData.software_version) {
         setDeviceInfo({
@@ -1388,9 +1534,31 @@ export default function Data() {
   const renderTimeSeriesChartCard = (config, containerStyle = {}) => (
     <div
       key={config.key}
+      ref={(element) => setChartCardRef(config.key, element)}
       style={{ border: "1px solid #d0d7de", borderRadius: "10px", padding: "14px", backgroundColor: "#fff", ...containerStyle }}
     >
-      <h5 style={{ margin: "0 0 10px 0", fontWeight: 700, fontSize: "24px", textAlign: "center" }}>{config.title}</h5>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <h5 style={{ margin: 0, fontWeight: 700, fontSize: "24px", textAlign: "center", flex: "1 1 auto" }}>{config.title}</h5>
+        <button
+          type="button"
+          onClick={() => downloadChartAsPng(
+            config.key,
+            config.title,
+            selectedBatchLabel ? `${config.title} ${selectedBatchLabel}` : config.title
+          )}
+          style={{
+            padding: "7px 12px",
+            borderRadius: "4px",
+            border: "1px solid #d0d7de",
+            backgroundColor: "#ffffff",
+            cursor: "pointer",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Download PNG
+        </button>
+      </div>
       {config.lines.length > 1 ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", justifyContent: "center", marginBottom: "10px" }}>
           {config.lines.map((line) => (
@@ -1494,7 +1662,7 @@ export default function Data() {
             cursor: "pointer",
             border: "none",
             borderRadius: "5px",
-            backgroundColor: activeTab === "history" ? "#28a745" : "#e0e0e0",
+            backgroundColor: activeTab === "history" ? uiAccentGreen : "#e0e0e0",
             color: activeTab === "history" ? "white" : "#333"
           }}
         >
@@ -1511,7 +1679,7 @@ export default function Data() {
             cursor: "pointer",
             border: "none",
             borderRadius: "5px",
-            backgroundColor: activeTab === "live" ? "#28a745" : "#e0e0e0",
+            backgroundColor: activeTab === "live" ? uiAccentGreen : "#e0e0e0",
             color: activeTab === "live" ? "white" : "#333"
           }}
         >
@@ -1597,6 +1765,28 @@ export default function Data() {
                    cursor: "pointer"
                 }}
               />
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "15px",
+                  color: "#102a43",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: authRequired ? "default" : "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isUploadPublic}
+                  onChange={(e) => setIsUploadPublic(e.target.checked)}
+                  disabled={authRequired}
+                  style={{ width: "16px", height: "16px", margin: 0 }}
+                />
+                Mark this upload as public
+              </label>
               
               <button 
                 onClick={handleFileUpload} 
@@ -1606,7 +1796,7 @@ export default function Data() {
                   width: "100%",
                   padding: "12px 14px", 
                   cursor: !selectedFile || authRequired ? "default" : "pointer",
-                  backgroundColor: !selectedFile || authRequired ? "#b8c2cc" : "#0f9d58",
+                  backgroundColor: !selectedFile || authRequired ? "#b8c2cc" : uiAccentGreen,
                   color: "white",
                   border: "none",
                   borderRadius: "12px",
@@ -1847,6 +2037,21 @@ export default function Data() {
                 </div>
 
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={downloadAllChartsAsPng}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "4px",
+                        border: "1px solid #d0d7de",
+                        backgroundColor: "#ffffff",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Download All PNGs
+                    </button>
                     <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
                       Batch
                     </label>
@@ -2038,10 +2243,35 @@ export default function Data() {
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "30px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "30px" }}>
                       {graphConfigurations.map((config) => (
-                        <div key={config.key} style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 14px 0", fontWeight: 700, fontSize: "24px", textAlign: "center" }}>{config.title}</h4>
+                        <div
+                          key={config.key}
+                          ref={(element) => setChartCardRef(config.key, element)}
+                          style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}
+                        >
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                            <h4 style={{ margin: 0, fontWeight: 700, fontSize: "24px", textAlign: "center", flex: "1 1 auto" }}>{config.title}</h4>
+                            <button
+                              type="button"
+                              onClick={() => downloadChartAsPng(
+                                config.key,
+                                config.title,
+                                selectedBatchLabel ? `${config.title} ${selectedBatchLabel}` : config.title
+                              )}
+                              style={{
+                                padding: "7px 12px",
+                                borderRadius: "4px",
+                                border: "1px solid #d0d7de",
+                                backgroundColor: "#ffffff",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Download PNG
+                            </button>
+                          </div>
                           <div style={{ width: '100%', height: 430 }}>
                             <ResponsiveContainer>
                               {config.chartType === "bar" ? (
@@ -2200,7 +2430,7 @@ export default function Data() {
                             borderRadius: "4px",
                             border: "none",
                             cursor: "pointer",
-                            backgroundColor: savingBatchKey === selectedBatchKey ? "#ccc" : "#28a745",
+                            backgroundColor: savingBatchKey === selectedBatchKey ? "#ccc" : uiAccentGreen,
                             color: "white"
                           }}
                         >
@@ -2238,11 +2468,8 @@ export default function Data() {
 
           <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
             <div style={{ width: "100%", maxWidth: "880px", textAlign: "left", border: "1px solid #d6dee8", borderRadius: "18px", background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)", boxShadow: "0 18px 40px rgba(15, 23, 42, 0.06)", padding: "22px" }}>
-              <div style={{ fontSize: "20px", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: "#0f9d58", marginBottom: "8px", textAlign: "center" }}>
+              <div style={{ fontSize: "20px", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: uiAccentGreen, marginBottom: "8px", textAlign: "center" }}>
                 Live Session Destination
-              </div>
-              <div style={{ fontSize: "14px", color: "#526071", marginBottom: "16px", textAlign: "center" }}>
-                Pick a personal or organization workspace before you start recording.
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "12px", maxHeight: "250px", overflowY: "auto", paddingRight: "4px" }}>
@@ -2283,7 +2510,7 @@ export default function Data() {
               style={{
                 padding: "15px 30px",
                 fontSize: "18px",
-                backgroundColor: isConnected || authRequired ? "#ccc" : "#28a745",
+                backgroundColor: isConnected || authRequired ? "#ccc" : uiAccentGreen,
                 color: "white",
                 border: "none",
                 borderRadius: "5px",
@@ -2317,28 +2544,26 @@ export default function Data() {
                 style={{
                   padding: "15px 30px",
                   fontSize: "18px",
-                  backgroundColor: authRequired ? "#ccc" : "#28a745",
+                  backgroundColor: authRequired ? "#ccc" : uiAccentGreen,
                   color: "white",
                   border: "none",
                   borderRadius: "5px",
                   cursor: authRequired ? "default" : "pointer",
                 }}
               >
-                ⏺ Start Recording
+                Start Recording
               </button>
             )}
           </div>
 
-          {isConnected && (
+          {isConnected && isRecording && (
             <p style={{ 
               marginBottom: "10px", 
               fontSize: "14px", 
-              color: isRecording ? "#28a745" : "#666",
-              fontWeight: isRecording ? "bold" : "normal"
+              color: uiAccentGreen,
+              fontWeight: "bold"
             }}>
-              {isRecording 
-                ? `⏺ Recording to Session #${liveSession?.sessionId || '(starting...)'}` 
-                : "⏸ Monitoring only (not recording)"}
+              {`⏺ Recording to Session #${liveSession?.sessionId || '(starting...)'}`}
             </p>
           )}
 
