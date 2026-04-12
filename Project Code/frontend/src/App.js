@@ -1,35 +1,5 @@
-/*import React, { useEffect, useState } from "react";
-
-function App() {
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    // The frontend requests data from the backend
-    fetch(`${process.env.REACT_APP_API_URL}/hello`)
-      .then((res) => res.json())
-      .then(setData)
-      .catch(() => setData({ message: "Backend not reachable" }));
-  }, []);
-
-  return (
-    <div style={{ textAlign: "center", marginTop: "4rem" }}>
-      <h1>STELLA</h1>
-      {data ? (
-        <>
-          <p>{data.message}</p>
-          <p>Visits: {data.totalVisits}</p>
-        </>
-      ) : (
-        <p>Loading...</p>
-      )}
-    </div>
-  );
-} 
-
-export default App; */
-
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { UserProvider } from "./userContext";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
@@ -41,44 +11,49 @@ import Docs from "./pages/Docs";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Account from "./pages/Account";
+import CreateOrg from "./pages/CreateOrg";
+import OrgManage from "./pages/OrgManage";
 import Footer from "./components/Footer";
-
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [ownedOrgId, setOwnedOrgId] = useState(null);
 
-  // check if the user is logged in via cookies, display certain links on navbar based on this
-  const checkLogin = async() => {
-    try {
-      const response = await fetch("http://localhost:8000/api/users/status", {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (response.status === 401) {
-        setLoggedIn(false);
-        return;
-      }
-      else if (response.status === 400) {
-        return;
-      }
-
-      setLoggedIn(true);
-    }
-    catch (err) {
-      console.log(err);
-    }
+  function ScrollToTop() {
+    const { pathname } = useLocation();
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, [pathname]);
+    return null;
   }
 
-  // only call once per render
+  const refreshUser = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/users/me", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        setLoggedIn(false);
+        setOwnedOrgId(null);
+        return;
+      }
+      const data = await response.json();
+      setLoggedIn(true);
+      setOwnedOrgId(data.owned_org_id || null);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   useEffect(() => {
-    checkLogin();
+    refreshUser();
   }, []);
 
   return (
     <UserProvider>
       <Router>
-        <Navbar loggedIn={loggedIn} setLoggedIn={setLoggedIn}/>
+        <ScrollToTop />
+        <Navbar loggedIn={loggedIn} setLoggedIn={setLoggedIn} ownedOrgId={ownedOrgId} setOwnedOrgId={setOwnedOrgId} />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
@@ -86,11 +61,13 @@ function App() {
           <Route path="/map" element={<Map />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/docs" element={<Docs />} />
-          <Route path="/login" element={<Login setLoggedIn={setLoggedIn}/>} />
+          <Route path="/login" element={<Login setLoggedIn={setLoggedIn} refreshUser={refreshUser} />} />        
           <Route path="/register" element={<Register />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/orgs/create" element={<CreateOrg refreshUser={refreshUser} />} />
+          <Route path="/orgs/:id/manage" element={<OrgManage refreshUser={refreshUser} />} />
         </Routes>
-        <Footer></Footer>
+        <Footer />
       </Router>
     </UserProvider>
   );

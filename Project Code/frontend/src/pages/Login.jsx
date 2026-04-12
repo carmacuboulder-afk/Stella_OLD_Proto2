@@ -1,12 +1,18 @@
 import "../css/Login.css";
+import "../css/Register.css";
 import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 
-function Login({setLoggedIn}) {
-    // setting up states for user inputs
+function Login({refreshUser}) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [toast, setToast] = useState(null);
     const nav = useNavigate();
+
+    const showToast = (msg, type) => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 2000);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -25,17 +31,22 @@ function Login({setLoggedIn}) {
                 throw new Error(data.error || "Login failed");
             }
 
-            // console.log("Login successful:", data);
-            setLoggedIn(true);
+            await refreshUser();
             nav("/");
         } 
         catch (err) {
             console.log(err);
+            showToast("Login Failed!", "failure");
         } 
     };
 
     return (
         <main className="login">
+            {toast && (
+                <div className={`toast toast-${toast.type}`}>
+                    {toast.msg}
+                </div>
+            )}
             <h1><b>Login</b></h1>
             <div className="login-form-container">
                 <form onSubmit={handleSubmit}>

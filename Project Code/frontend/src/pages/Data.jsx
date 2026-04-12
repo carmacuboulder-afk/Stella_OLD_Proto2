@@ -2,20 +2,29 @@ import React, { useState, useEffect, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Link } from "react-router-dom";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 export default function Data() {
   const [activeTab, setActiveTab] = useState("history");
   const [selectedReferenceBatchKey, setSelectedReferenceBatchKey] = useState(""); //for white reference
 
   const [uploads, setUploads] = useState([]);
+  const [accessibleOrgs, setAccessibleOrgs] = useState([]);
   const [selectedUploadId, setSelectedUploadId] = useState(null);
   const [rawUploadRows, setRawUploadRows] = useState([]);
   const [graphData, setGraphData] = useState([]);
   const [loadingGraph, setLoadingGraph] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadPublic, setIsUploadPublic] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [uploadActionState, setUploadActionState] = useState({ uploadId: null, action: null });
+  const [isHistoryEditMode, setIsHistoryEditMode] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
   const [batchNoteDrafts, setBatchNoteDrafts] = useState({});
   const [batchNoteSaveStatus, setBatchNoteSaveStatus] = useState({});
   const [savingBatchKey, setSavingBatchKey] = useState(null);
+  const [selectedDestination, setSelectedDestination] = useState("user");
+  const [selectedHistoryScope, setSelectedHistoryScope] = useState("user");
 
   const [selectedBatchKey, setSelectedBatchKey] = useState("");
   const [selectedTimestampIndex, setSelectedTimestampIndex] = useState(0);
@@ -61,9 +70,11 @@ export default function Data() {
   // Use refs to track recording state and buffer for immediate access in callbacks
   const isRecordingRef = useRef(false);
   const recordingBufferRef = useRef([]);
+  const chartCardRefs = useRef({});
 
   const pointDotStyle = { r: 1.5, fill: "#c7c7c7", stroke: "#c7c7c7", strokeWidth: 1 };
   const activePointDotStyle = { r: 2.5, fill: "#aaaaaa", stroke: "#aaaaaa", strokeWidth: 1 };
+  const uiAccentGreen = "#a0bc98";
   const formatNumberWithCommas = (value, maximumFractionDigits = 4) =>
     Number(value).toLocaleString('en-US', {
       minimumFractionDigits: 0,
@@ -94,12 +105,79 @@ export default function Data() {
   ];
   const wavelengthLookup = Object.fromEntries(wavelengthBands.map((band) => [band.nm, band]));
   const reflectanceMetadataLabel = "Estimated reflectance";
+  const clearSelectedUploadState = () => {
+    setSelectedUploadId(null);
+    setSelectedBatchKey("");
+    setSelectedReferenceBatchKey("");
+    setRawUploadRows([]);
+    setGraphData([]);
+    setBatchNoteDrafts({});
+    setBatchNoteSaveStatus({});
+    setSavingBatchKey(null);
+  };
+  const handleAuthRequired = (message = "Please log in to view and upload data.") => {
+    setAuthRequired(true);
+    setUploads([]);
+    setAccessibleOrgs([]);
+    setUploadActionState({ uploadId: null, action: null });
+    clearSelectedUploadState();
+    setUploadStatus(message);
+  };
+  const normalizeIdentifier = (value) => (value === null || value === undefined ? null : `${value}`);
+  const normalizeUploadRecord = (upload) => ({
+    ...upload,
+    id: normalizeIdentifier(upload.id),
+    org_id: normalizeIdentifier(upload.org_id),
+    can_delete: Boolean(upload.can_delete),
+    can_remove_from_org: Boolean(upload.can_remove_from_org),
+  });
+  const selectedDestinationOrgId = selectedDestination.startsWith("org:")
+    ? selectedDestination.slice(4)
+    : null;
+  const resolveSelectedDestination = () => {
+    if (selectedDestinationOrgId === null) {
+      return { orgId: null, label: "My Uploads" };
+    }
+
+    const organization = accessibleOrgs.find((org) => normalizeIdentifier(org.id) === selectedDestinationOrgId);
+    return {
+      orgId: organization?.id ?? null,
+      label: organization?.name ?? "Organization",
+    };
+  };
+  const isUploadInSelectedDestination = (upload) => {
+    if (selectedDestinationOrgId === null) {
+      return upload.scope_type === "user" && (upload.org_id === null || upload.org_id === undefined);
+    }
+
+    return upload.scope_type === "organization" && normalizeIdentifier(upload.org_id) === selectedDestinationOrgId;
+  };
+  const buildScopeKey = ({ scope_type, org_id }) => (
+    scope_type === "organization" ? `org:${normalizeIdentifier(org_id)}` : "user"
+  );
   const formatTimeLabel = (date) => {
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
     });
+  };
+  const formatDecimalHourLabel = (decimalHour, fallbackDate = null) => {
+    const parsedDecimalHour = Number(decimalHour);
+
+    if (Number.isFinite(parsedDecimalHour)) {
+      const totalSeconds = Math.round(parsedDecimalHour * 60 * 60);
+      const normalizedSeconds = ((totalSeconds % 86400) + 86400) % 86400;
+      const hours = Math.floor(normalizedSeconds / 3600);
+      const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+      const seconds = normalizedSeconds % 60;
+      const meridiem = hours >= 12 ? 'PM' : 'AM';
+      const displayHour = hours % 12 || 12;
+
+      return `${displayHour}:${`${minutes}`.padStart(2, '0')}:${`${seconds}`.padStart(2, '0')} ${meridiem}`;
+    }
+
+    return fallbackDate ? formatTimeLabel(fallbackDate) : "--";
   };
   const normalizeBatchDate = (rawBatchDate, fallbackDate) => {
     const normalizedFallback = fallbackDate.toISOString().slice(0, 10);
@@ -191,6 +269,116 @@ export default function Data() {
 
     const padding = maxValue === 0 ? 1 : Math.max(Math.abs(maxValue) * 0.1, 0.1);
     return [Math.max(0, minValue - padding), maxValue + padding];
+  };
+  const setChartCardRef = (chartKey, element) => {
+    if (element) {
+      chartCardRefs.current[chartKey] = element;
+      return;
+    }
+
+    delete chartCardRefs.current[chartKey];
+  };
+  const sanitizeDownloadFileName = (value) => (
+    `${value || "chart"}`
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      || "chart"
+  );
+  const downloadChartAsPng = async (chartKey, chartTitle, fileLabel = chartTitle) => {
+    const chartCard = chartCardRefs.current[chartKey];
+    const chartSvg = chartCard?.querySelector("svg");
+
+    if (!chartSvg) {
+      window.alert("The graph is not ready to download yet.");
+      return;
+    }
+
+    const viewBox = chartSvg.viewBox?.baseVal;
+    const svgWidth = Number(chartSvg.getAttribute("width"));
+    const svgHeight = Number(chartSvg.getAttribute("height"));
+    const exportWidth = Math.max(
+      Math.round(
+        (viewBox?.width && Number.isFinite(viewBox.width) ? viewBox.width : 0)
+        || (Number.isFinite(svgWidth) ? svgWidth : 0)
+        || chartSvg.clientWidth
+        || 0
+      ),
+      800
+    );
+    const exportHeight = Math.max(
+      Math.round(
+        (viewBox?.height && Number.isFinite(viewBox.height) ? viewBox.height : 0)
+        || (Number.isFinite(svgHeight) ? svgHeight : 0)
+        || chartSvg.clientHeight
+        || 0
+      ),
+      500
+    );
+    const titleFontSize = 28;
+    const titlePaddingTop = 28;
+    const titleSpacing = 18;
+    const canvasWidth = exportWidth;
+    const canvasHeight = exportHeight + titleFontSize + titlePaddingTop + titleSpacing;
+    const serializedSvg = new XMLSerializer().serializeToString(chartSvg);
+    const svgMarkupWithNamespace = serializedSvg.includes("xmlns=")
+      ? serializedSvg
+      : serializedSvg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+    const svgMarkup = svgMarkupWithNamespace
+      .replace(/width="[^"]*"/, `width="${exportWidth}"`)
+      .replace(/height="[^"]*"/, `height="${exportHeight}"`);
+    const svgBlob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const image = new Image();
+
+    try {
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+        image.src = svgUrl;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvasWidth, canvasHeight);
+      context.fillStyle = "#111827";
+      context.font = `700 ${titleFontSize}px Arial, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "top";
+      context.fillText(chartTitle, canvasWidth / 2, titlePaddingTop, canvasWidth - 40);
+      context.drawImage(image, 0, titleFontSize + titlePaddingTop + titleSpacing, exportWidth, exportHeight);
+
+      const downloadLink = document.createElement("a");
+      downloadLink.href = canvas.toDataURL("image/png");
+      downloadLink.download = `${sanitizeDownloadFileName(fileLabel)}.png`;
+      downloadLink.click();
+    } catch (error) {
+      console.error("Failed to download chart", error);
+      window.alert("Couldn't download that graph. Please try again.");
+    } finally {
+      URL.revokeObjectURL(svgUrl);
+    }
+  };
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const downloadAllChartsAsPng = async () => {
+    const allChartConfigs = [
+      ...graphConfigurations,
+      ...timeSeriesGraphConfigurations,
+      ...vegetationIndexTimeSeriesConfigurations,
+    ];
+
+    for (const chartConfig of allChartConfigs) {
+      const fileLabel = selectedBatchLabel
+        ? `${chartConfig.title} ${selectedBatchLabel}`
+        : chartConfig.title;
+      await downloadChartAsPng(chartConfig.key, chartConfig.title, fileLabel);
+      await wait(150);
+    }
   };
 
   const availableBatches = Array.from(
@@ -290,7 +478,7 @@ export default function Data() {
   const timeSeriesGraphConfigurations = [
     {
       key: "raw_visible_over_time",
-      title: "Raw Visible Spectrum Over Time",
+      title: "Raw Visible Spectrum",
       subtitle: "Batch measurements across visible wavelengths over time.",
       yAxisLabel: "Measurement Magnitude (uW/cm²)",
       lines: [
@@ -305,7 +493,7 @@ export default function Data() {
     },
     {
       key: "raw_infrared_over_time",
-      title: "Raw Infrared Spectrum Over Time",
+      title: "Raw Infrared Spectrum",
       subtitle: "Batch measurements across infrared wavelengths over time.",
       yAxisLabel: "Measurement Magnitude (uW/cm²)",
       lines: [
@@ -318,7 +506,7 @@ export default function Data() {
     },
     {
       key: "reflectance_over_time",
-      title: "Reflectance Over Time",
+      title: "Reflectance",
       subtitle: "Batch reflectance values across all wavelengths over time.",
       yAxisLabel: "Measurement Magnitude",
       lines: wavelengthBands.map((band) => ({
@@ -329,7 +517,7 @@ export default function Data() {
     },
     {
       key: "temperature_over_time",
-      title: "Temperature Over Time",
+      title: "Temperature",
       subtitle: "Air and surface temperature for the selected batch over time.",
       yAxisLabel: "Temperature (°C)",
       lines: [
@@ -341,29 +529,72 @@ export default function Data() {
   const vegetationIndexTimeSeriesConfigurations = [
     {
       key: "ndvi_over_time",
-      title: "NDVI Over Time",
+      title: "NDVI",
       yAxisLabel: "NDVI",
       lines: [{ dataKey: "ndvi", stroke: "#2E8B57", name: "NDVI" }],
     },
     {
       key: "sr_over_time",
-      title: "SR Over Time",
+      title: "SR",
       yAxisLabel: "SR",
       lines: [{ dataKey: "sr", stroke: "#1E90FF", name: "SR" }],
     },
     {
       key: "dswi4_over_time",
-      title: "DSWI 4 Over Time",
+      title: "DSWI 4",
       yAxisLabel: "DSWI 4",
       lines: [{ dataKey: "dswi4", stroke: "#A0522D", name: "DSWI 4" }],
     },
     {
       key: "nirv_over_time",
-      title: "NIRv Over Time",
+      title: "NIRv",
       yAxisLabel: "NIRv",
       lines: [{ dataKey: "nirv", stroke: "#800080", name: "NIRv" }],
     },
   ];
+  const groupedUploads = Array.from(
+    uploads.reduce((groups, upload) => {
+      const key = buildScopeKey(upload);
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: upload.scope_label,
+          uploads: [],
+        });
+      }
+
+      groups.get(key).uploads.push(upload);
+      return groups;
+    }, new Map()).values()
+  );
+  const scopeCards = [
+    {
+      key: "user",
+      title: "Personal",
+      subtitle: "Your own uploads",
+      accent: uiAccentGreen,
+      count: uploads.filter((upload) => buildScopeKey(upload) === "user").length,
+    },
+    ...accessibleOrgs.map((org, index) => {
+      const key = `org:${normalizeIdentifier(org.id)}`;
+      return {
+        key,
+        title: org.name,
+        subtitle: "Organization data",
+        accent: uiAccentGreen,
+        count: uploads.filter((upload) => buildScopeKey(upload) === key).length,
+      };
+    }),
+  ];
+  const selectedHistoryUploads = groupedUploads.find((group) => group.key === selectedHistoryScope)?.uploads ?? [];
+  const selectedHistoryScopeCard = scopeCards.find((scope) => scope.key === selectedHistoryScope) ?? scopeCards[0];
+  const selectedUploadRecord = uploads.find(
+    (upload) => normalizeIdentifier(upload.id) === normalizeIdentifier(selectedUploadId)
+  ) ?? null;
+  const isUploadActionPending = (uploadId) => (
+    normalizeIdentifier(uploadActionState.uploadId) === normalizeIdentifier(uploadId)
+  );
 
   // Retry sending buffered data
   useEffect(() => {
@@ -381,10 +612,55 @@ export default function Data() {
     }
   }, [dataBuffer, isSending]);
 
-  // history tab
   useEffect(() => {
-    fetchUploads();
+    const loadInitialData = async () => {
+      await Promise.all([fetchUserContext(), fetchUploads()]);
+    };
+
+    loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (selectedDestination === "user") return;
+
+    const destinationStillAvailable = accessibleOrgs.some(
+      (org) => `org:${normalizeIdentifier(org.id)}` === selectedDestination
+    );
+
+    if (!destinationStillAvailable) {
+      setSelectedDestination("user");
+    }
+  }, [accessibleOrgs, selectedDestination]);
+
+  useEffect(() => {
+    const historyScopeStillAvailable = scopeCards.some((scope) => scope.key === selectedHistoryScope);
+
+    if (!historyScopeStillAvailable) {
+      setSelectedHistoryScope("user");
+    }
+  }, [scopeCards, selectedHistoryScope]);
+
+  useEffect(() => {
+    if (selectedUploadId === null) return;
+
+    const selectedUploadStillVisible = uploads.some(
+      (upload) => normalizeIdentifier(upload.id) === normalizeIdentifier(selectedUploadId)
+    );
+    if (!selectedUploadStillVisible) {
+      clearSelectedUploadState();
+      return;
+    }
+
+    const selectedUpload = uploads.find(
+      (upload) => normalizeIdentifier(upload.id) === normalizeIdentifier(selectedUploadId)
+    );
+    if (selectedUpload) {
+      const scopeKey = buildScopeKey(selectedUpload);
+      if (scopeKey !== selectedHistoryScope) {
+        setSelectedHistoryScope(scopeKey);
+      }
+    }
+  }, [uploads, selectedUploadId, selectedHistoryScope]);
 
   useEffect(() => {
     if (availableBatches.length === 0) {
@@ -543,11 +819,47 @@ export default function Data() {
 
   const fetchUploads = async () => {
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads`);
+      const res = await fetch(`${API_BASE_URL}/api/uploads`, {
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
       const data = await res.json();
-      setUploads(data);
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch uploads");
+      }
+      setAuthRequired(false);
+      setUploads(data.map(normalizeUploadRecord));
     } catch (err) {
       console.error("Failed to fetch uploads", err);
+    }
+  };
+
+  const fetchUserContext = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch user context");
+      }
+
+      setAuthRequired(false);
+      setAccessibleOrgs(
+        Array.isArray(data.orgs)
+          ? data.orgs.map((org) => ({ ...org, id: normalizeIdentifier(org.id) }))
+          : []
+      );
+    } catch (err) {
+      console.error("Failed to fetch user context", err);
     }
   };
 
@@ -561,11 +873,29 @@ export default function Data() {
     setSavingBatchKey(null);
     setLoadingGraph(true);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/${uploadId}/data`);
+      const res = await fetch(`${API_BASE_URL}/api/uploads/${uploadId}/data`, {
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch graph data");
+      }
       
       // Sort by timestamp to ensure correct order
-      const sorted = data.sort((a, b) => new Date(a.timestamp_iso8601) - new Date(b.timestamp_iso8601));
+      const sorted = data.sort((a, b) => {
+        const aDecimalHour = parseOptionalNumber(a.decimal_hour ?? a.dec_hour);
+        const bDecimalHour = parseOptionalNumber(b.decimal_hour ?? b.dec_hour);
+
+        if (aDecimalHour !== null && bDecimalHour !== null && aDecimalHour !== bDecimalHour) {
+          return aDecimalHour - bDecimalHour;
+        }
+
+        return new Date(a.timestamp_iso8601) - new Date(b.timestamp_iso8601);
+      });
       
       const formatted = sorted.map((row, index) => {
         const date = new Date(row.timestamp_iso8601);
@@ -590,12 +920,13 @@ export default function Data() {
           id: index,
           dataPointId: row.id,
           timestamp: row.timestamp_iso8601,
+          decimalHour: parseOptionalNumber(row.decimal_hour ?? row.dec_hour),
           batchNumber,
           batchDate,
           batchKey,
           batchLabel: buildBatchLabel(batchNumber, batchDate),
           note: row.note || "",
-          timeLabel: formatTimeLabel(date),
+          timeLabel: formatDecimalHourLabel(row.decimal_hour ?? row.dec_hour, date),
           // Temperature (try both uppercase and lowercase column names from postgres)
           surface_temp: parseOptionalNumber(row.surface_temperature_c ?? row.surface_temperature_C),
           air_temp: parseOptionalNumber(row.air_temperature_c ?? row.air_temperature_C),
@@ -644,6 +975,102 @@ export default function Data() {
     }));
   };
 
+  const handleDeleteUpload = async (upload) => {
+    if (!upload?.can_delete || isUploadActionPending(upload.id)) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${upload.upload_name}?`
+    );
+    if (!confirmed) return;
+
+    setUploadActionState({ uploadId: upload.id, action: "delete" });
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/uploads/${upload.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete upload");
+      }
+
+      setUploads((prev) => prev.filter((item) => normalizeIdentifier(item.id) !== normalizeIdentifier(upload.id)));
+      if (normalizeIdentifier(selectedUploadId) === normalizeIdentifier(upload.id)) {
+        clearSelectedUploadState();
+      }
+      setIsHistoryEditMode((prev) => {
+        const remainingUploads = uploads.filter((item) => normalizeIdentifier(item.id) !== normalizeIdentifier(upload.id));
+        const hasRemainingDeletableUploads = remainingUploads.some((item) => item.can_delete);
+        return hasRemainingDeletableUploads ? prev : false;
+      });
+      setUploadStatus(`Deleted "${upload.upload_name}".`);
+    } catch (error) {
+      setUploadStatus(`Error: ${error.message}`);
+    } finally {
+      setUploadActionState({ uploadId: null, action: null });
+    }
+  };
+
+  const handleRemoveFromOrg = async (upload) => {
+    if (!upload?.can_remove_from_org || isUploadActionPending(upload.id)) return;
+
+    const confirmed = window.confirm(
+      `Remove "${upload.upload_name}" from this organization? The upload will stay with the original uploader and move back to personal uploads.`
+    );
+    if (!confirmed) return;
+
+    setUploadActionState({ uploadId: upload.id, action: "remove" });
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/uploads/${upload.id}/remove-from-org`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to remove upload from organization");
+      }
+
+      const normalizedUpload = normalizeUploadRecord(data.upload);
+      const currentUserOwnsUpload = Boolean(normalizedUpload.can_delete);
+
+      setUploads((prev) => {
+        if (!currentUserOwnsUpload) {
+          return prev.filter((item) => normalizeIdentifier(item.id) !== normalizeIdentifier(upload.id));
+        }
+
+        return prev.map((item) =>
+          normalizeIdentifier(item.id) === normalizeIdentifier(upload.id) ? normalizedUpload : item
+        );
+      });
+
+      if (normalizeIdentifier(selectedUploadId) === normalizeIdentifier(upload.id)) {
+        if (currentUserOwnsUpload) {
+          setSelectedHistoryScope("user");
+        } else {
+          clearSelectedUploadState();
+        }
+      }
+
+      setUploadStatus(`Removed "${upload.upload_name}" from the organization.`);
+    } catch (error) {
+      setUploadStatus(`Error: ${error.message}`);
+    } finally {
+      setUploadActionState({ uploadId: null, action: null });
+    }
+  };
+
   const handleSaveBatchNote = async () => {
     if (!selectedUploadId || !selectedBatchKey || !selectedBatchOption) return;
     const note = batchNoteDrafts[selectedBatchKey] ?? "";
@@ -651,8 +1078,9 @@ export default function Data() {
     setBatchNoteSaveStatus((prev) => ({ ...prev, [selectedBatchKey]: "" }));
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/data/batch-note`, {
+      const res = await fetch(`${API_BASE_URL}/api/data/batch-note`, {
         method: 'PUT',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uploadId: selectedUploadId,
@@ -661,6 +1089,10 @@ export default function Data() {
           note,
         }),
       });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
 
       const responseBody = await res.json();
       if (!res.ok) {
@@ -692,21 +1124,33 @@ export default function Data() {
   const handleFileUpload = async () => {
     if (!selectedFile) return;
 
-    const isDuplicate = uploads.some(u => u.upload_name === selectedFile.name);
+    const destination = resolveSelectedDestination();
+    const isDuplicate = uploads.some((upload) =>
+      isUploadInSelectedDestination(upload) && upload.upload_name === selectedFile.name
+    );
     
     if (isDuplicate) {
-      setUploadStatus(`Error: "No duplicate file names. Please rename your file.`);
+      setUploadStatus(`Error: "${destination.label}" already has an upload named "${selectedFile.name}".`);
       return;
     }
     const formData = new FormData();
     formData.append("file", selectedFile);
+    formData.append("is_public", isUploadPublic ? "true" : "false");
+    if (destination.orgId !== null) {
+      formData.append("org_id", `${destination.orgId}`);
+    }
 
     try {
       setUploadStatus("Uploading...");
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/csv`, {
+      const res = await fetch(`${API_BASE_URL}/api/uploads/csv`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
       const data = await res.json();
       if (res.ok) {
         const hasBatchWarnings = Array.isArray(data.batchWarnings) && data.batchWarnings.length > 0;
@@ -714,6 +1158,7 @@ export default function Data() {
           `Success! Processed ${data.rows || 0} rows.${hasBatchWarnings ? ' Duplicate batch numbers were split by date in the viewer.' : ''}`
         );
         setSelectedFile(null);
+        setIsUploadPublic(false);
         fetchUploads();
       } else {
         setUploadStatus(`Error: ${data.error}`);
@@ -725,11 +1170,21 @@ export default function Data() {
   // live tab
   const startLiveSession = async (deviceType, softwareVersion) => {
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/start`, {
+      const destination = resolveSelectedDestination();
+      const res = await fetch(`${API_BASE_URL}/api/uploads/live/start`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_type: deviceType, software_version: softwareVersion }),
+        body: JSON.stringify({
+          device_type: deviceType,
+          software_version: softwareVersion,
+          org_id: destination.orgId,
+        }),
       });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return null;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setLiveSession({ sessionId: data.sessionId, deviceId: data.deviceId });
@@ -744,11 +1199,16 @@ export default function Data() {
   const endLiveSession = async () => {
     if (!liveSession) return;
     try {
-      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/end`, {
+      const res = await fetch(`${API_BASE_URL}/api/uploads/live/end`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: liveSession.sessionId }),
       });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
       console.log('Live session ended');
       fetchUploads(); // Refresh uploads list
     } catch (error) {
@@ -839,8 +1299,9 @@ export default function Data() {
       let uploaded = 0;
       for (const data of dataPoints) {
         try {
-          const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/data`, {
+          const res = await fetch(`${API_BASE_URL}/api/uploads/live/data`, {
             method: 'POST',
+            credentials: "include",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               sessionId: session.sessionId,
@@ -848,6 +1309,10 @@ export default function Data() {
               ...data
             }),
           });
+          if (res.status === 401) {
+            handleAuthRequired();
+            return { uploaded, total: dataPoints.length };
+          }
           if (res.ok) uploaded++;
         } catch (error) {
           console.error('Failed to upload data point:', error);
@@ -855,11 +1320,15 @@ export default function Data() {
       }
       
       // End session
-      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/end`, {
+      const endRes = await fetch(`${API_BASE_URL}/api/uploads/live/end`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: session.sessionId }),
       });
+      if (endRes.status === 401) {
+        handleAuthRequired();
+      }
       
       console.log(`Batch uploaded: ${uploaded}/${dataPoints.length} points`);
       return { uploaded, total: dataPoints.length };
@@ -913,8 +1382,9 @@ export default function Data() {
     }
 
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/uploads/live/data`, {
+      const res = await fetch(`${API_BASE_URL}/api/uploads/live/data`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: currentSession.sessionId,
@@ -922,6 +1392,10 @@ export default function Data() {
           ...data
         }),
       });
+      if (res.status === 401) {
+        handleAuthRequired();
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       
       // Successfully uploaded
@@ -958,6 +1432,10 @@ export default function Data() {
         if (key && value !== undefined) {
           newData[key] = value;
         }
+      }
+
+      if ((newData.dec_hour === undefined || newData.dec_hour === "") && newData.decimal_hour !== undefined) {
+        newData.dec_hour = newData.decimal_hour;
       }
 
       // Store device info when we see it
@@ -1056,9 +1534,31 @@ export default function Data() {
   const renderTimeSeriesChartCard = (config, containerStyle = {}) => (
     <div
       key={config.key}
+      ref={(element) => setChartCardRef(config.key, element)}
       style={{ border: "1px solid #d0d7de", borderRadius: "10px", padding: "14px", backgroundColor: "#fff", ...containerStyle }}
     >
-      <h5 style={{ margin: "0 0 10px 0", fontWeight: 700, fontSize: "24px", textAlign: "center" }}>{config.title}</h5>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <h5 style={{ margin: 0, fontWeight: 700, fontSize: "24px", textAlign: "center", flex: "1 1 auto" }}>{config.title}</h5>
+        <button
+          type="button"
+          onClick={() => downloadChartAsPng(
+            config.key,
+            config.title,
+            selectedBatchLabel ? `${config.title} ${selectedBatchLabel}` : config.title
+          )}
+          style={{
+            padding: "7px 12px",
+            borderRadius: "4px",
+            border: "1px solid #d0d7de",
+            backgroundColor: "#ffffff",
+            cursor: "pointer",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Download PNG
+        </button>
+      </div>
       {config.lines.length > 1 ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", justifyContent: "center", marginBottom: "10px" }}>
           {config.lines.map((line) => (
@@ -1150,17 +1650,19 @@ export default function Data() {
 
 
       {/* tab toggle */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "30px", zoom: "67%" }}>
+      <div style={{ display: "flex", justifyContent: "center", width: "100%", marginBottom: "30px", zoom: "67%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", width: "100%", maxWidth: "480px" }}>
         <button 
           onClick={() => setActiveTab("history")}
           style={{
+            width: "100%",
             padding: "10px 30px",
             fontSize: "16px",
             fontWeight: "bold",
             cursor: "pointer",
             border: "none",
             borderRadius: "5px",
-            backgroundColor: activeTab === "history" ? "#28a745" : "#e0e0e0",
+            backgroundColor: activeTab === "history" ? uiAccentGreen : "#e0e0e0",
             color: activeTab === "history" ? "white" : "#333"
           }}
         >
@@ -1170,68 +1672,136 @@ export default function Data() {
         <button 
           onClick={() => setActiveTab("live")}
           style={{
+            width: "100%",
             padding: "10px 30px",
             fontSize: "16px",
             fontWeight: "bold",
             cursor: "pointer",
             border: "none",
             borderRadius: "5px",
-            backgroundColor: activeTab === "live" ? "#28a745" : "#e0e0e0",
+            backgroundColor: activeTab === "live" ? uiAccentGreen : "#e0e0e0",
             color: activeTab === "live" ? "white" : "#333"
           }}
         >
           Live Monitor
         </button>
+        </div>
       </div>
 
       {/* history*/}
       {activeTab === "history" && (
         <div className="fade-in">
+          {authRequired && (
+            <div style={{ marginBottom: "24px", padding: "16px 18px", border: "1px solid #f5c2c7", borderRadius: "8px", backgroundColor: "#fff5f5", color: "#842029", zoom: "67%" }}>
+              Please log in to view personal and organization uploads.
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "40px", zoom: "67%" }}>
             
             {/* upload box */}
             <div style={{ 
-              padding: "20px", 
-              border: "1px solid #ccc", 
-              borderRadius: "8px", 
-              width: "350px",
-              height: "350", 
-              overflow: "hidden",
+              padding: "24px", 
+              border: "1px solid #d6dee8", 
+              borderRadius: "18px", 
+              background: "linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)",
+              boxShadow: "0 18px 40px rgba(15, 23, 42, 0.08)",
+              minHeight: "350px", 
               boxSizing: "border-box",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "center"
+              justifyContent: "flex-start"
             }}>
-              <h3 style={{ marginTop: 0 }}>Upload New Data</h3>
+              <h3 style={{ marginTop: 0, marginBottom: "18px", fontSize: "28px", textAlign: "center", fontWeight: 800 }}>Upload New Data</h3>
+
+              <div style={{ marginBottom: "16px", textAlign: "left" }}>
+                <div style={{ fontWeight: "bold", marginBottom: "10px", fontSize: "14px", color: "#102a43" }}>
+                  Upload Destination
+                </div>
+                <div style={{ display: "grid", gap: "10px", maxHeight: "250px", overflowY: "auto", paddingRight: "4px" }}>
+                  {scopeCards.map((scope) => {
+                    const isSelected = selectedDestination === scope.key;
+                    return (
+                      <button
+                        key={`destination-${scope.key}`}
+                        type="button"
+                        onClick={() => setSelectedDestination(scope.key)}
+                        disabled={authRequired}
+                        style={{
+                          textAlign: "left",
+                          padding: "14px 16px",
+                          borderRadius: "14px",
+                          border: isSelected ? `2px solid ${scope.accent}` : "1px solid #d7e0ea",
+                          background: "#ffffff",
+                          color: "#102a43",
+                          cursor: authRequired ? "default" : "pointer",
+                          boxShadow: "none",
+                          transition: "all 150ms ease",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "15px" }}>{scope.title}</div>
+                          <div style={{ marginTop: "4px", fontSize: "12px", color: "#526071" }}>{scope.subtitle}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               
               <input 
                 type="file" 
                 accept=".csv" 
                 onChange={(e) => setSelectedFile(e.target.files[0])} 
+                disabled={authRequired}
                 style={{ 
                    marginBottom: "15px", 
-                   border: "1px solid #ccc",
-                   padding: "5px",
-                   borderRadius: "5px",
-                   backgroundColor: "#f9f9f9",
-                   width: "68%",
+                   border: "1px solid #d7e0ea",
+                   padding: "10px 12px",
+                   borderRadius: "12px",
+                   backgroundColor: "#ffffff",
+                   width: "100%",
                    boxSizing: "border-box",
                    cursor: "pointer"
                 }}
               />
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "15px",
+                  color: "#102a43",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: authRequired ? "default" : "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isUploadPublic}
+                  onChange={(e) => setIsUploadPublic(e.target.checked)}
+                  disabled={authRequired}
+                  style={{ width: "16px", height: "16px", margin: 0 }}
+                />
+                Mark this upload as public
+              </label>
               
               <button 
                 onClick={handleFileUpload} 
-                disabled={!selectedFile} 
+                disabled={!selectedFile || authRequired} 
                 style={{ 
                   marginLeft: "0",
                   width: "100%",
-                  padding: "8px 10px", 
-                  cursor: "pointer",
-                  backgroundColor: !selectedFile ? "#ccc" : "#28a745",
+                  padding: "12px 14px", 
+                  cursor: !selectedFile || authRequired ? "default" : "pointer",
+                  backgroundColor: !selectedFile || authRequired ? "#b8c2cc" : uiAccentGreen,
                   color: "white",
                   border: "none",
-                  borderRadius: "4px"
+                  borderRadius: "12px",
+                  fontWeight: 700,
+                  boxShadow: !selectedFile || authRequired ? "none" : "0 14px 28px rgba(15, 157, 88, 0.18)",
                 }}
               >
                 Upload
@@ -1250,26 +1820,199 @@ export default function Data() {
             </div>
 
             {/* history list */}
-            <div style={{ padding: "20px", border: "1px solid #ccc", borderRadius: "8px", maxHeight: "200px", overflowY: "auto", textAlign: "left" }}>
-              <h3 style={{ marginTop: 0 }}>Select Past Upload</h3>
-              {uploads.length === 0 ? <p>No uploads found.</p> : (
-                <ul style={{ listStyle: "none", padding: 0 }}>
-                  {uploads.map(u => (
-                    <li 
-                      key={u.id} 
-                      onClick={() => handleSelectUpload(u.id)}
-                      style={{ 
-                        padding: "8px", 
-                        cursor: "pointer", 
-                        borderBottom: "1px solid #eee",
-                        backgroundColor: selectedUploadId === u.id ? "#edf5f9ff" : "transparent", 
-                        wordWrap: "break-all"
-                      }}
-                    >
-                    {u.upload_name}
-                    </li>
-                  ))}
-                </ul>
+            <div style={{ padding: "24px", border: "1px solid #d6dee8", borderRadius: "18px", background: "linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)", boxShadow: "0 18px 40px rgba(15, 23, 42, 0.06)", textAlign: "left" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+                <h3 style={{ margin: 0, fontSize: "28px", textAlign: "center", fontWeight: 800, flex: 1 }}>Select Past Upload</h3>
+                {!authRequired && uploads.some((upload) => upload.can_delete) ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsHistoryEditMode((prev) => !prev)}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "999px",
+                      border: "1px solid #d7e0ea",
+                      backgroundColor: isHistoryEditMode ? "#fff1f2" : "#ffffff",
+                      color: isHistoryEditMode ? "#b91c1c" : "#102a43",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {isHistoryEditMode ? "Done" : "Edit"}
+                  </button>
+                ) : null}
+              </div>
+              {authRequired ? (
+                <p>Log in to load your uploads.</p>
+              ) : uploads.length === 0 ? (
+                <p>No uploads found for your account or organizations.</p>
+              ) : (
+                <>
+                  <div style={{ fontWeight: "bold", marginTop: "18px", marginBottom: "10px", fontSize: "14px", color: "#102a43" }}>
+                    Upload Destination
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 220px) 1fr", gap: "18px", alignItems: "start" }}>
+                    <div style={{ display: "grid", gap: "10px", maxHeight: "255px", overflowY: "auto", paddingRight: "4px" }}>
+                      {scopeCards.map((scope) => {
+                        const isActive = selectedHistoryScope === scope.key;
+                        return (
+                          <button
+                            key={`history-scope-${scope.key}`}
+                            type="button"
+                            onClick={() => {
+                              const nextScopeUploads = groupedUploads.find((group) => group.key === scope.key)?.uploads ?? [];
+                              setSelectedHistoryScope(scope.key);
+                              const currentUploadInScope = nextScopeUploads.some(
+                                (upload) => normalizeIdentifier(upload.id) === normalizeIdentifier(selectedUploadId)
+                              );
+                              if (!currentUploadInScope) {
+                                clearSelectedUploadState();
+                              }
+                            }}
+                            style={{
+                              textAlign: "left",
+                              padding: "14px 15px",
+                              borderRadius: "14px",
+                              border: isActive ? `2px solid ${scope.accent}` : "1px solid #d7e0ea",
+                              background: "#ffffff",
+                              cursor: "pointer",
+                              color: "#102a43",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: "15px" }}>{scope.title}</div>
+                                <div style={{ marginTop: "4px", fontSize: "12px", color: "#526071" }}>{scope.subtitle}</div>
+                              </div>
+                              <div style={{
+                                minWidth: "30px",
+                                height: "30px",
+                                borderRadius: "999px",
+                                backgroundColor: "#edf2f7",
+                                color: scope.accent,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "12px",
+                                fontWeight: 700,
+                              }}>
+                                {scope.count}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ border: "1px solid #e2e8f0", borderRadius: "16px", backgroundColor: "#ffffff", minHeight: "260px", overflow: "hidden" }}>
+                      {selectedHistoryUploads.length === 0 ? (
+                        <div style={{ padding: "22px 18px", color: "#526071", fontSize: "14px" }}>
+                          No uploads in this scope yet.
+                        </div>
+                      ) : (
+                        <div style={{ maxHeight: "255px", overflowY: "auto", padding: "10px" }}>
+                          {selectedHistoryUploads.map((upload) => {
+                            const isSelected = normalizeIdentifier(upload.id) === normalizeIdentifier(selectedUploadId);
+                            const isActionPending = isUploadActionPending(upload.id);
+                            const createdLabel = upload.created_at
+                              ? new Date(upload.created_at).toLocaleDateString()
+                              : "";
+
+                            return (
+                              <div
+                                key={upload.id}
+                                onClick={() => handleSelectUpload(upload.id)}
+                                style={{
+                                  width: "100%",
+                                  textAlign: "left",
+                                  padding: "14px 16px",
+                                  borderRadius: "14px",
+                                  border: isSelected ? `2px solid ${selectedHistoryScopeCard?.accent || "#1f6feb"}` : "1px solid #edf2f7",
+                                  background: "#ffffff",
+                                  marginBottom: "10px",
+                                  boxShadow: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "12px" }}>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                      <div style={{ fontWeight: 700, fontSize: "15px", color: "#102a43", wordBreak: "break-word" }}>
+                                        {upload.upload_name}
+                                      </div>
+                                      {isHistoryEditMode && upload.can_delete ? (
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleDeleteUpload(upload);
+                                          }}
+                                          disabled={isActionPending}
+                                          style={{
+                                            padding: "3px 8px",
+                                            borderRadius: "999px",
+                                            border: "1px solid #fecaca",
+                                            backgroundColor: isActionPending ? "#f1f5f9" : "#fff1f2",
+                                            color: "#b91c1c",
+                                            fontSize: "10px",
+                                            fontWeight: 700,
+                                            cursor: isActionPending ? "default" : "pointer",
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          {uploadActionState.action === "delete" && isActionPending ? "Deleting..." : "Delete"}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                    <div style={{ marginTop: "6px", fontSize: "12px", color: "#526071" }}>
+                                      {createdLabel ? `Added ${createdLabel}` : "Recently uploaded"}
+                                    </div>
+                                  </div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                    {isHistoryEditMode && upload.can_remove_from_org ? (
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleRemoveFromOrg(upload);
+                                        }}
+                                        disabled={isActionPending}
+                                        style={{
+                                          padding: "6px 10px",
+                                          borderRadius: "999px",
+                                          border: "1px solid #d0d7de",
+                                          backgroundColor: isActionPending ? "#f1f5f9" : "#fff7ed",
+                                          color: "#9a3412",
+                                          fontSize: "11px",
+                                          fontWeight: 700,
+                                          cursor: isActionPending ? "default" : "pointer",
+                                        }}
+                                      >
+                                        {uploadActionState.action === "remove" && isActionPending ? "Removing..." : "Remove from org"}
+                                      </button>
+                                    ) : null}
+                                    <div style={{
+                                      padding: "5px 8px",
+                                      borderRadius: "999px",
+                                      backgroundColor: isSelected ? (selectedHistoryScopeCard?.accent || "#1f6feb") : "#edf2f7",
+                                      color: isSelected ? "#fff" : "#526071",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      whiteSpace: "nowrap",
+                                    }}>
+                                      {isSelected ? "Viewing" : "Open"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1294,6 +2037,21 @@ export default function Data() {
                 </div>
 
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={downloadAllChartsAsPng}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "4px",
+                        border: "1px solid #d0d7de",
+                        backgroundColor: "#ffffff",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Download All PNGs
+                    </button>
                     <label htmlFor="batch-filter" style={{ fontWeight: "bold", fontSize: "14px" }}>
                       Batch
                     </label>
@@ -1485,10 +2243,35 @@ export default function Data() {
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "30px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "30px" }}>
                       {graphConfigurations.map((config) => (
-                        <div key={config.key} style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 14px 0", fontWeight: 700, fontSize: "24px", textAlign: "center" }}>{config.title}</h4>
+                        <div
+                          key={config.key}
+                          ref={(element) => setChartCardRef(config.key, element)}
+                          style={{ border: "1px solid #222", borderRadius: "12px", padding: "14px" }}
+                        >
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                            <h4 style={{ margin: 0, fontWeight: 700, fontSize: "24px", textAlign: "center", flex: "1 1 auto" }}>{config.title}</h4>
+                            <button
+                              type="button"
+                              onClick={() => downloadChartAsPng(
+                                config.key,
+                                config.title,
+                                selectedBatchLabel ? `${config.title} ${selectedBatchLabel}` : config.title
+                              )}
+                              style={{
+                                padding: "7px 12px",
+                                borderRadius: "4px",
+                                border: "1px solid #d0d7de",
+                                backgroundColor: "#ffffff",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Download PNG
+                            </button>
+                          </div>
                           <div style={{ width: '100%', height: 430 }}>
                             <ResponsiveContainer>
                               {config.chartType === "bar" ? (
@@ -1647,7 +2430,7 @@ export default function Data() {
                             borderRadius: "4px",
                             border: "none",
                             cursor: "pointer",
-                            backgroundColor: savingBatchKey === selectedBatchKey ? "#ccc" : "#28a745",
+                            backgroundColor: savingBatchKey === selectedBatchKey ? "#ccc" : uiAccentGreen,
                             color: "white"
                           }}
                         >
@@ -1677,18 +2460,61 @@ export default function Data() {
       {/* live */}
       {activeTab === "live" && (
         <div className="fade-in" style={{ zoom: "67%" }}>
+          {authRequired && (
+            <div style={{ marginBottom: "24px", padding: "16px 18px", border: "1px solid #f5c2c7", borderRadius: "8px", backgroundColor: "#fff5f5", color: "#842029" }}>
+              Please log in to save live sessions to your account or organizations.
+            </div>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+            <div style={{ width: "100%", maxWidth: "880px", textAlign: "left", border: "1px solid #d6dee8", borderRadius: "18px", background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)", boxShadow: "0 18px 40px rgba(15, 23, 42, 0.06)", padding: "22px" }}>
+              <div style={{ fontSize: "20px", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: uiAccentGreen, marginBottom: "8px", textAlign: "center" }}>
+                Live Session Destination
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "12px", maxHeight: "250px", overflowY: "auto", paddingRight: "4px" }}>
+                {scopeCards.map((scope) => {
+                  const isSelected = selectedDestination === scope.key;
+                  return (
+                    <button
+                      key={`live-destination-${scope.key}`}
+                      type="button"
+                      onClick={() => setSelectedDestination(scope.key)}
+                      disabled={authRequired || isRecording}
+                      style={{
+                        textAlign: "left",
+                        padding: "15px 16px",
+                        borderRadius: "14px",
+                        border: isSelected ? `2px solid ${scope.accent}` : "1px solid #d7e0ea",
+                        background: "#ffffff",
+                        cursor: authRequired || isRecording ? "default" : "pointer",
+                        color: "#102a43",
+                        opacity: authRequired || isRecording ? 0.72 : 1,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "15px" }}>{scope.title}</div>
+                        <div style={{ marginTop: "4px", fontSize: "12px", color: "#526071" }}>{scope.subtitle}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "center", gap: "15px", marginBottom: "30px" }}>
             <button
               onClick={connectToSerial}
-              disabled={isConnected}
+              disabled={isConnected || authRequired}
               style={{
                 padding: "15px 30px",
                 fontSize: "18px",
-                backgroundColor: isConnected ? "#ccc" : "#28a745",
+                backgroundColor: isConnected || authRequired ? "#ccc" : uiAccentGreen,
                 color: "white",
                 border: "none",
                 borderRadius: "5px",
-                cursor: isConnected ? "default" : "pointer",
+                cursor: isConnected || authRequired ? "default" : "pointer",
               }}
             >
               {isConnected ? "Connected" : "Connect to USB Device"}
@@ -1714,31 +2540,30 @@ export default function Data() {
             {isConnected && !isRecording && (
               <button
                 onClick={startRecording}
+                disabled={authRequired}
                 style={{
                   padding: "15px 30px",
                   fontSize: "18px",
-                  backgroundColor: "#28a745",
+                  backgroundColor: authRequired ? "#ccc" : uiAccentGreen,
                   color: "white",
                   border: "none",
                   borderRadius: "5px",
-                  cursor: "pointer",
+                  cursor: authRequired ? "default" : "pointer",
                 }}
               >
-                ⏺ Start Recording
+                Start Recording
               </button>
             )}
           </div>
 
-          {isConnected && (
+          {isConnected && isRecording && (
             <p style={{ 
               marginBottom: "10px", 
               fontSize: "14px", 
-              color: isRecording ? "#28a745" : "#666",
-              fontWeight: isRecording ? "bold" : "normal"
+              color: uiAccentGreen,
+              fontWeight: "bold"
             }}>
-              {isRecording 
-                ? `⏺ Recording to Session #${liveSession?.sessionId || '(starting...)'}` 
-                : "⏸ Monitoring only (not recording)"}
+              {`⏺ Recording to Session #${liveSession?.sessionId || '(starting...)'}`}
             </p>
           )}
 
