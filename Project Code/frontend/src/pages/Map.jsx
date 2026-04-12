@@ -12,7 +12,7 @@ const stellaIcon = new Icon({
   iconSize: [32, 32]
 })
 
-// This is here for when we integrate EVA markers for map rendering.
+// This is here for when EVA markers are integrated for map rendering.
 const evaIcon = new Icon({
   iconUrl: require("../img/evaPin.png"),
   iconSize: [32, 32]
@@ -32,40 +32,6 @@ function RecenterMap({ lat, lng }) {
 
     return null;
 }
-
-const fetchPublicData = async () => {
-  try {
-    const res = await fetch(
-      "http://localhost:8000/api/uploads/public"
-    );
-    const uploads = await res.json();
-
-    if (!Array.isArray(uploads)) {
-      console.error("Public uploads not array:", uploads);
-      return;
-    }
-
-    const allData = await Promise.all(
-      uploads.map(async (upload) => {
-        const resData = await fetch(
-          `http://localhost:8000/api/data/upload/${upload.id}`
-        );
-        return await resData.json();
-      })
-    );
-
-    const flattenedData= allData.flat();
-
-    const withCoords = flattenedData.filter(
-      r => r.latitude != null && r.longitude != null
-    );
-
-    setPublicMarkers(withCoords);
-  } 
-  catch (err) {
-    console.error("Error fetching public data:", err);
-  }
-};
 
 export default function Map() {
   const { user, loading: userLoading } = useUser();
@@ -152,6 +118,40 @@ export default function Map() {
     }
     fetchUserData();
   }, [user, userLoading]);
+
+  const fetchPublicData = async () => {
+    try {
+      const res = await fetch(
+        "http://localhost:8000/api/uploads/public"
+      );
+      const uploads = await res.json();
+
+      if (!Array.isArray(uploads)) {
+        console.error("Public uploads not array:", uploads);
+        return;
+      }
+
+      const allData = await Promise.all(
+        uploads.map(async (upload) => {
+          const resData = await fetch(
+            `http://localhost:8000/api/data/upload/${upload.id}`
+          );
+          return await resData.json();
+        })
+      );
+
+      const flattenedData= allData.flat();
+
+      const withCoords = flattenedData.filter(
+        r => r.latitude != null && r.longitude != null
+      );
+
+      setPublicMarkers(withCoords);
+    } 
+    catch (err) {
+      console.error("Error fetching public data:", err);
+    }
+  };
 
   const cancelEdit = (id) => {
     setEditingCoords(prev => {
