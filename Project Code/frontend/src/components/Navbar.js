@@ -1,9 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useUser } from "../userContext";
 import "../css/navbar.css";
 import logo from "../img/stella_logo.PNG";
 
 export default function Navbar({ loggedIn, setLoggedIn, ownedOrgId, setOwnedOrgId }) {
   const nav = useNavigate();
+
+  const { setUser } = useUser();
 
   const handleLogout = async () => {
     try {
@@ -16,6 +19,7 @@ export default function Navbar({ loggedIn, setLoggedIn, ownedOrgId, setOwnedOrgI
       if (!response.ok) throw new Error(data.error || "Logout failed");
       setLoggedIn(false);
       setOwnedOrgId(null);
+      setUser(null);
       nav("/login");
     } 
     catch (err) {

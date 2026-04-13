@@ -76,6 +76,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+    return res.status(400).json({ error: "Error getting logged in session." });
   }
 });
 

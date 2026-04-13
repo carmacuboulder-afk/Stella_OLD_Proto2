@@ -51,6 +51,43 @@ router.get('/upload/:uploadId', async (req, res, next) => {
   }
 });
 
+// GET /api/data/upload/:uploadId/markers
+router.get('/upload/:uploadId/markers', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+        d.id,
+        d.upload_id,
+        d.device_id,
+        d.latitude,
+        d.longitude,
+        d.timestamp_iso8601,
+        u.org_id,
+        o.name AS org_name,
+        COALESCE(bn.batch_notes, '[]') AS batch_notes
+      FROM data d
+      JOIN uploads u ON u.id = d.upload_id
+      LEFT JOIN organizations o ON o.id = u.org_id
+      LEFT JOIN LATERAL (
+        SELECT json_agg(
+          jsonb_build_object(
+            'batch_number', bn.batch_number,
+            'batch_date', bn.batch_date,
+            'note', bn.note
+          )
+        ) AS batch_notes
+        FROM batch_notes bn
+        WHERE bn.upload_id = u.id
+      ) bn ON true
+      WHERE d.upload_id = $1;`,
+      [req.params.uploadId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PUT /api/data/:id/coordinates
 router.put('/:id/coordinates', async (req, res) => {
   const { latitude, longitude } = req.body;

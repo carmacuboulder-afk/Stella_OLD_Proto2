@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import { UserProvider } from "./userContext";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Data from "./pages/Data";
@@ -49,24 +50,26 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <ScrollToTop />
-      <Navbar loggedIn={loggedIn} setLoggedIn={setLoggedIn} ownedOrgId={ownedOrgId} setOwnedOrgId={setOwnedOrgId} />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/data" element={<Data />} />
-        <Route path="/map" element={<Map />} />
-        <Route path="/faq" element={<FAQ />} />
-        <Route path="/docs" element={<Docs />} />
-        <Route path="/login" element={<Login setLoggedIn={setLoggedIn} refreshUser={refreshUser} />} />        
-        <Route path="/register" element={<Register />} />
-        <Route path="/account" element={<Account />} />
-        <Route path="/orgs/create" element={<CreateOrg refreshUser={refreshUser} />} />
-        <Route path="/orgs/:id/manage" element={<OrgManage refreshUser={refreshUser} />} />
-      </Routes>
-      <Footer />
-    </Router>
+    <UserProvider>
+      <Router>
+        <ScrollToTop />
+        <Navbar loggedIn={loggedIn} setLoggedIn={setLoggedIn} ownedOrgId={ownedOrgId} setOwnedOrgId={setOwnedOrgId} />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/data" element={<Data />} />
+          <Route path="/map" element={<Map />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/docs" element={<Docs />} />
+          <Route path="/login" element={<Login setLoggedIn={setLoggedIn} refreshUser={refreshUser} />} />        
+          <Route path="/register" element={<Register />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/orgs/create" element={<CreateOrg refreshUser={refreshUser} />} />
+          <Route path="/orgs/:id/manage" element={<OrgManage refreshUser={refreshUser} />} />
+        </Routes>
+        <Footer />
+      </Router>
+    </UserProvider>
   );
 }
 

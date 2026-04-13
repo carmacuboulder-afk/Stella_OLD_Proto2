@@ -130,6 +130,23 @@ router.get('/', requireAuth, async (req, res, next) => {
   }
 });
 
+// GET /api/uploads/public
+router.get('/public', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM uploads
+       WHERE is_public = true
+       ORDER BY created_at DESC`
+    );
+
+    res.json(result.rows);
+  } 
+  catch(err) {
+    alert("Could not fetch public STELLA data.");
+    next(err);
+  }
+});
+
 // POST /api/uploads/csv
 router.post('/csv', requireAuth, upload.single('file'), async (req, res, next) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -632,5 +649,33 @@ router.get('/user/:userId', requireAuth, async (req, res, next) => {
   }
 });
 
+// GET /api/uploads/user/:userId/with-orgs
+router.get('/user/:userId/with-orgs', requireAuth, async (req, res, next) => {
+  const { userId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT DISTINCT u.*
+      FROM uploads u
+      LEFT JOIN user_organizations uo
+        ON u.org_id = uo.organization_id
+      WHERE 
+        u.user_id = $1
+        OR (
+          uo.user_id = $1
+          AND uo.status = 'accepted'
+        )
+      ORDER BY u.org_id NULLS FIRST
+      `,
+      [userId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching uploads by user:", err);
+    next(err);
+  }
+});
 
 export default router;
