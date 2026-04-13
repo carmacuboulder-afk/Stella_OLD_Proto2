@@ -649,5 +649,33 @@ router.get('/user/:userId', requireAuth, async (req, res, next) => {
   }
 });
 
+// GET /api/uploads/user/:userId/with-orgs
+router.get('/user/:userId/with-orgs', requireAuth, async (req, res, next) => {
+  const { userId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT DISTINCT u.*
+      FROM uploads u
+      LEFT JOIN user_organizations uo
+        ON u.org_id = uo.organization_id
+      WHERE 
+        u.user_id = $1
+        OR (
+          uo.user_id = $1
+          AND uo.status = 'accepted'
+        )
+      ORDER BY u.org_id NULLS FIRST
+      `,
+      [userId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching uploads by user:", err);
+    next(err);
+  }
+});
 
 export default router;

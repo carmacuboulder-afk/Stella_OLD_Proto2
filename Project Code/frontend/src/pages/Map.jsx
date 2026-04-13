@@ -7,16 +7,22 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet"
 import { Icon } from "leaflet";
 
-const stellaIcon = new Icon({
-  iconUrl: require("../img/stellaPin.png"),
-  iconSize: [32, 32]
+const userIcon = new Icon({
+  iconUrl: require("../img/personalStellaPin.png"),
+  iconSize: [33, 33]
 })
 
+const orgIcon = new Icon({
+  iconUrl: require("../img/orgStellaPin.png"),
+  iconSize: [33, 33]
+})
 // This is here for when EVA markers are integrated for map rendering.
 const evaIcon = new Icon({
   iconUrl: require("../img/evaPin.png"),
-  iconSize: [32, 32]
+  iconSize: [33, 33]
 })
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 let lat = 40.0190; // Boulder Latitude
 let long = -105.2747; // Boulder Longitude
@@ -35,34 +41,140 @@ function RecenterMap({ lat, lng }) {
 
 export default function Map() {
   const { user, loading: userLoading } = useUser();
-  const [markers, setMarkers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editingCoords, setEditingCoords] = useState({});
+
+  // Regular map markers
+  const [markers, setMarkers] = useState([]);
   const [missingCoords, setMissingCoords] = useState([]);
+
+  // Used when editing coords in missing window.
+  const [editingCoords, setEditingCoords] = useState({});
   const [showMissingWindow, setShowMissingWindow] = useState(false);
+
+  // Public Data
   const [showPublic, setShowPublic] = useState(false);
   const [publicMarkers, setPublicMarkers] = useState([]);
+
+  // EVA API
   const [showEva, setShowEva] = useState(false);
 
-  // Search Bar additions
+  // Search Bar
   const [inputLat, setInputLat] = useState("");
   const [inputLng, setInputLng] = useState("");
   const [searchLat, setSearchLat] = useState(null);
   const [searchLng, setSearchLng] = useState(null);
-
   const isValidLat = inputLat >= -90 && inputLat <= 90 && !isNaN(inputLat);
   const isValidLng = inputLng >= -180 && inputLng <= 180 && !isNaN(inputLng);
+
+  const fetchPublicData = async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/uploads/public`
+      );
+      const uploads = await res.json();
+
+      if (!Array.isArray(uploads)) {
+        console.error("Public uploads not array:", uploads);
+        return;
+      }
+
+      const publicData = await Promise.all(
+        uploads.map(async (upload) => {
+          const resData = await fetch(
+            `${API_BASE_URL}/api/data/upload/${upload.id}`
+          );
+          return await resData.json();
+        })
+      );
+
+      const flattenedPubData = publicData.flat();
+
+      const withCoords = flattenedPubData.filter(
+        r => r.latitude != null && r.longitude != null
+      );
+
+      setPublicMarkers(withCoords);
+    } 
+    catch (err) {
+      console.error("Error fetching public data:", err);
+    }
+  };
+
+  const cancelEdit = (id) => {
+    setEditingCoords(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  }
+
+  const saveCoordinates = async (readingId) => {
+    const coords = editingCoords[readingId];
+    if (!coords || coords.lat === "" || coords.lng === "") {
+      alert("Please enter both latitude and longitude");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/data/${readingId}/coordinates`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude: parseFloat(coords.lat),
+          longitude: parseFloat(coords.lng),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save coordinates");
+
+      // Update local state
+      const reading = missingCoords.find(r => r.id === readingId);
+      if(reading.is_public) {
+        setPublicMarkers(prev => [
+          ...prev,
+          {
+            ...reading,
+            latitude: parseFloat(coords.lat),
+            longitude: parseFloat(coords.lng)
+          }
+        ]);
+      }
+      else {
+        setMarkers(prev => [
+          ...prev,
+          {
+            ...reading,
+            latitude: parseFloat(coords.lat),
+            longitude: parseFloat(coords.lng)
+          }
+        ]);
+      }
+      setMissingCoords(prev => prev.filter(r => r.id !== readingId));
+
+      cancelEdit(readingId);
+    } 
+    catch (err) {
+      alert("Failed to save coordinates.");
+    }
+  }
 
   useEffect(() => {
     // Wait until we know if user is logged in.
     if (userLoading) return;
+
+    // Clear potential cached login state
+    if (user == null) {
+      setMarkers([]);
+      setMissingCoords([]);
+      setPublicMarkers([]);
+    }
 
     async function fetchUserData() {
       try {
         let uploads;
         if(user) {
           uploads = await fetch(
-              `http://localhost:8000/api/uploads/user/${user.id}`,
+              `${API_BASE_URL}/api/uploads/user/${user.id}/with-orgs`,
               { credentials: "include" }
           );
           if(user.lat != null && user.long != null) {
@@ -70,12 +182,10 @@ export default function Map() {
             long = user.long;
           }
         }
-        else {       
-          uploads = await fetch(
-            `http://localhost:8000/api/uploads/public`,
-            { credentials: "include" }
-          );
-          setShowPublic(!showPublic);
+        else {
+          fetchPublicData();
+          setShowPublic(true);
+          return;
         }
         const uploadData = await uploads.json();
 
@@ -90,7 +200,7 @@ export default function Map() {
         const allData = await Promise.all(
           uploadData.map(async (upload) => {
             const resData = await fetch(
-              `http://localhost:8000/api/data/upload/${upload.id}`,
+              `${API_BASE_URL}/api/data/upload/${upload.id}/markers`,
               { credentials: "include" }
             );
             const data = await resData.json();
@@ -118,86 +228,6 @@ export default function Map() {
     }
     fetchUserData();
   }, [user, userLoading]);
-
-  const fetchPublicData = async () => {
-    try {
-      const res = await fetch(
-        "http://localhost:8000/api/uploads/public"
-      );
-      const uploads = await res.json();
-
-      if (!Array.isArray(uploads)) {
-        console.error("Public uploads not array:", uploads);
-        return;
-      }
-
-      const allData = await Promise.all(
-        uploads.map(async (upload) => {
-          const resData = await fetch(
-            `http://localhost:8000/api/data/upload/${upload.id}`
-          );
-          return await resData.json();
-        })
-      );
-
-      const flattenedData= allData.flat();
-
-      const withCoords = flattenedData.filter(
-        r => r.latitude != null && r.longitude != null
-      );
-
-      setPublicMarkers(withCoords);
-    } 
-    catch (err) {
-      console.error("Error fetching public data:", err);
-    }
-  };
-
-  const cancelEdit = (id) => {
-    setEditingCoords(prev => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
-    });
-  }
-
-  const saveCoordinates = async (readingId) => {
-    const coords = editingCoords[readingId];
-    if (!coords || coords.lat === "" || coords.lng === "") {
-      alert("Please enter both latitude and longitude");
-      return;
-    }
-
-    try {
-      const res = await fetch(`http://localhost:8000/api/data/${readingId}/coordinates`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          latitude: parseFloat(coords.lat),
-          longitude: parseFloat(coords.lng),
-        }),
-      });
-
-      if (!res.ok) throw new Error("Failed to save coordinates");
-
-      // Update local state
-      const reading = missingCoords.find(r => r.id === readingId);
-      setMarkers(prev => [
-        ...prev,
-        {
-          ...reading,
-          latitude: parseFloat(coords.lat),
-          longitude: parseFloat(coords.lng)
-        }
-      ]);
-      setMissingCoords(prev => prev.filter(r => r.id !== readingId));
-
-      cancelEdit(readingId);
-    } 
-    catch (err) {
-      alert("Failed to save coordinates.");
-    }
-  }
 
   if (loading) return <p>Loading map data...</p>;
 
@@ -260,10 +290,25 @@ export default function Map() {
               ) : (
                 missingCoords.map(reading => (
                   <div class="noCoordEntry" key={reading.upload_id}>
-                    <strong>Upload Number:</strong> {reading.upload_id}<br/>
-                    <strong>Device Number:</strong> {reading.device_id}<br/>
-                    <strong>Record Number:</strong> {reading.id}<br/>
+                    <strong>Upload ID:</strong> {reading.upload_id}<br/>
+                    <strong>Device ID:</strong> {reading.device_id}<br/>
+                    <strong>Recording:</strong> {reading.id}<br/>
                     <strong>Recorded On:</strong> {new Date(reading.timestamp_iso8601).toLocaleString()}<br/>
+                    {reading.org_id != null && (
+                      <>
+                        <strong>Organization:</strong> {reading.org_name ?? "Unknown"} <br />
+                      </>
+                    )}
+                    {reading.batch_notes?.length > 0 && (
+                      <>
+                        <strong>Batch Notes:</strong>
+                        <ul>
+                          {reading.batch_notes.map((n, i) => (
+                            <li key={i}>{n.note}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                     {editingCoords[reading.id] ? (
                       <div class="addCoordsForm">
                         <input
@@ -325,7 +370,7 @@ export default function Map() {
         <RecenterMap lat={searchLat} lng={searchLng}/>
 
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> <a href="https://www.flaticon.com/free-icons/google-maps" title="maps and location icons">Icons: lalawidi</a>'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> <a href="https://www.flaticon.com/free-icons/google-maps" title="maps and location icons">Icons: Talha Dogar</a>'
           url = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
@@ -336,18 +381,33 @@ export default function Map() {
             <Marker
               key = {idx}
               position = {[reading.latitude, reading.longitude]}
-              icon = {stellaIcon}
+              icon={reading.org_id ? orgIcon : userIcon}
               eventHandlers={{
                 mouseover: (event) => event.target.openPopup(),
                 click: (event) => open('data')
               }}
             >
               <Popup class="mapPopup">
-                <strong>Upload Number:</strong> {reading.upload_id}<br />
-                <strong>Device Number:</strong> {reading.device_id}<br />
-                <strong>Record Number:</strong> {reading.id}<br />
+                <strong>Upload ID:</strong> {reading.upload_id}<br />
+                <strong>Device ID:</strong> {reading.device_id}<br />
+                <strong>Recording:</strong> {reading.id}<br />
                 <strong>Recorded On:</strong> {new Date(reading.timestamp_iso8601).toLocaleString()}<br />
                 <strong>Coordinates:</strong> {reading.latitude}, {reading.longitude}<br />
+                {reading.org_id != null && (
+                  <>
+                    <strong>Organization:</strong> {reading.org_name ?? "Unknown"} <br />
+                  </>
+                )}
+                {reading.batch_notes?.length > 0 && (
+                  <>
+                    <strong>Batch Notes:</strong>
+                    <ul>
+                      {reading.batch_notes.map((n, i) => (
+                        <li key={i}>{n.note}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </Popup>
             </Marker>
           );
@@ -360,18 +420,33 @@ export default function Map() {
             <Marker
               key={`public-${idx}`}
               position={[reading.latitude, reading.longitude]}
-              icon = {stellaIcon}
+              icon={reading.org_id ? orgIcon : userIcon}
               eventHandlers={{
                 mouseover: (event) => event.target.openPopup(),
                 click: (event) => open('data')
               }}
             >
               <Popup>
-                <strong>Upload Number:</strong> {reading.upload_id}<br />
-                <strong>Device Number:</strong> {reading.device_id}<br />
-                <strong>Record Number:</strong> {reading.id}<br />
+                <strong>Upload ID:</strong> {reading.upload_id}<br />
+                <strong>Device ID:</strong> {reading.device_id}<br />
+                <strong>Recording:</strong> {reading.id}<br />
                 <strong>Recorded On:</strong> {new Date(reading.timestamp_iso8601).toLocaleString()}<br />
                 <strong>Coordinates:</strong> {reading.latitude}, {reading.longitude}<br />
+                {reading.org_id != null && (
+                  <>
+                    <strong>Organization:</strong> {reading.org_name ?? "Unknown"} <br />
+                  </>
+                )}
+                {reading.batch_notes?.length > 0 && (
+                  <>
+                    <strong>Batch Notes:</strong>
+                    <ul>
+                      {reading.batch_notes.map((n, i) => (
+                        <li key={i}>{n.note}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </Popup>
             </Marker>
           );
