@@ -70,9 +70,10 @@ function Home() {
               in real time, and the page will fill in the metadata, environmental values, and spectral bands automatically.
             </p>
             <li>2. Manual File Upload</li>
-            <p>If you have data saved from an SD card or another source, you can upload the file manually. Make sure you are logged in to use this feature. The viewer will process 
-              the file and populate the same fields you would see during a live session. If your browser does not support the 
-              Web Serial API, try using Google Chrome, Microsoft Edge, or the manual upload option.
+            <p>If you have data saved from an SD card or another source, you can upload the file manually. Make sure you are logged in to use this feature.
+              When uploading, you can choose where your data will be stored.
+              Once uploaded, the viewer will process the file and populate the same fields you would see during a live session.
+              If your browser does not support the Web Serial API, try using Google Chrome or Microsoft Edge, or use the manual upload option instead.
             </p>
           </ul>
         </div>
@@ -87,7 +88,7 @@ function Home() {
       <section className="home-cards">
         <a href="./Map" className="flex flex-col items-center bg-white p-6 border border-gray-300 rounded-lg shadow md:flex-row md:max-w-xl">
         <div className="flex flex-col justify-between md:p-4 leading-normal">
-          <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900"> Visualize your STELLA data on a map. </h5>
+          <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900"> Visualize your data on a map. </h5>
           <p className="mb-6 text-gray-700">
             Each data point shows its GPS location, date, and time — with options to zoom, toggle, 
             and explore where measurements were taken

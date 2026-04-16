@@ -6,7 +6,7 @@
     font-family:Arial, Helvetica, sans-serif;
     margin-inline: auto;  
     max-width: 80vw;
-    padding: 40px 60px 56px;
+    padding: 40px 60px 80px;
     border-radius: 12px;
     box-shadow: 0 8px 20px rgba(0,0,0,0.06);
 }
@@ -28,6 +28,11 @@
   margin-bottom: 0.25rem;
 }
 
+.secondLevelList {
+  margin-left: 10px;
+  list-style-type: square; 
+}
+
 
 .doc h1 {
     font-size: 2rem;
@@ -45,7 +50,7 @@
     font-weight: bolder;
 }
 
-a {
+.doc a {
   color: #0000ee;             
   text-decoration: underline; 
 }
@@ -87,3 +92,7 @@ a {
     margin-top: 10rem;
 }
 
+.empty-container {
+    height: 30vh;
+
+}

@@ -2,6 +2,15 @@ import "../css/Docs.css";
 import "katex/dist/katex.min.css";
 import Demo from "../img/placeholder-vid.mov";
 import placeholder from "../img/placeholder.jpg";
+import MaunalUpload from "../img/ManualUploadFile.png";
+import NDVI from "../img/NDVI.png";
+import SR from "../img/SR.png";
+import DSWI from "../img/DSWI.png";
+import NIRv from "../img/NIRv.png";
+
+
+
+
 import { BlockMath } from "react-katex";
 
 
@@ -11,27 +20,47 @@ export default function Docs() {
     {
       title: "Reflectance",
       expression: "R_{\\lambda} = \\left(\\frac{I_{subject}}{I_{reference}}\\right) \\cdot C",
-      description: "Reflectance tracks how much incoming light a surface reflects compared with a reference material. Higher values mean the surface is reflecting more of that wavelength; lower values mean it is absorbing more."
+      description: (
+        <>
+        <strong>Reflectance</strong> tracks how much incoming light a surface reflects compared with a reference material. Higher values mean the surface is reflecting more of that wavelength; lower values mean it is absorbing more.
+        </>
+        )
     },
     {
       title: "NDVI",
       expression: "NDVI = \\frac{R_{NIR} - R_{RED}}{R_{NIR} + R_{RED}}",
-      description: "Normalized Difference Vegetation Index tracks vegetation density and health. Values near 1 usually indicate dense, healthy vegetation, values around 0 often indicate soil or non-living surfaces, and negative values often point to water."
+      description: (
+        <>
+        <strong>Normalized Difference Vegetation Index (NDVI)</strong> tracks vegetation density and health. Values near 1 usually indicate dense, healthy vegetation, values around 0 often indicate soil or non-living surfaces, and negative values often point to water.
+        </>
+        ) 
     },
     {
       title: "SR",
       expression: "SR = \\frac{R_{NIR}}{R_{RED}}",
-      description: "Simple Ratio tracks vegetation vigor by comparing near-infrared reflectance to red reflectance. Higher values generally suggest healthier or denser vegetation, while lower values suggest sparse or stressed cover."
+      description: (
+        <>
+        <strong>Simple Ratio (SR)</strong> tracks vegetation vigor by comparing near-infrared reflectance to red reflectance. Higher values generally suggest healthier or denser vegetation, while lower values suggest sparse or stressed cover.
+        </>
+      )
     },
     {
       title: "DSWI 4",
       expression: "DSWI_4 = \\frac{R_{NIR} - R_{GREEN}}{R_{RED} + R_{GREEN}}",
-      description: "Disease-Water Stress Index 4 tracks plant water stress. Lower or shifting values can indicate reduced water content or plant stress, while steadier values generally suggest less water stress."
+      description: (
+        <>
+        <strong>Disease-Water Stress Index 4 (DSWI4)</strong> tracks plant water stress. Lower or shifting values can indicate reduced water content or plant stress, while steadier values generally suggest less water stress.
+        </>
+      )
     },
     {
       title: "NIRv",
       expression: "NIRv = NDVI \\cdot R_{NIR}",
-      description: "Near-Infrared Reflectance of Vegetation tracks the portion of the near-infrared signal linked to vegetation. Higher values usually indicate stronger vegetation presence or productivity, especially in areas with patchy plant cover."
+      description: (
+        <>
+        <strong>Near-Infrared Reflectance of Vegetation (NIRv)</strong> tracks the portion of the near-infrared signal linked to vegetation. Higher values usually indicate stronger vegetation presence or productivity, especially in areas with patchy plant cover.
+        </>
+      )
     },
   ];
 
@@ -72,6 +101,14 @@ export default function Docs() {
                 <li>Insert the SD card into your computer and select your data file.</li>
                 <li>On the Upload page, choose your CSV file.</li>
                 <li>Upload the file.</li>
+                When uploading, you can choose where your data will be stored:
+                
+                <ul>
+                    <li className="secondLevelList">Personal – only visible to you</li>
+                    <li className="secondLevelList">Organization – shared with members of your organization</li>
+                    <li className="secondLevelList">Public – accessible to all users</li>
+                </ul>
+    
                 <li>If your dataset doesn’t include GPS, you can manually enter coordinates.</li>
             </ul>
             <p className="note">Troubleshooting: Common issues include unsupported file formats and missing data columns. See the FAQ for help.</p>
@@ -106,7 +143,7 @@ export default function Docs() {
                         style={{
                             display: "flex",
                             flexDirection: "column",
-                            gap: "4px"
+                            gap: "26px"
                         }}
                     >
                         <div
@@ -137,8 +174,15 @@ export default function Docs() {
             </p>
             { /*example images*/ }
             <img src={placeholder}/>
-            <img src={placeholder}/>
-                
+            <img src={MaunalUpload} style={{ marginTop: "250px" }}/>
+
+            <div className="empty-container"></div>
+
+            <img src={NDVI} alt="NDVI graph" style={{ marginTop: "1000px" }}/>
+            <img src={SR} alt="SR graph" style={{ marginTop: "20px" }}/>
+            <img src={DSWI} alt="DSWI graph" style={{ marginTop: "20px" }}/>
+            <img src={NIRv} alt="NIRv graph" style={{ marginTop: "20px" }}/>
+                            
         </div>
 
 
