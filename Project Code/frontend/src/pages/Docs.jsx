@@ -1,7 +1,7 @@
 import "../css/Docs.css";
 import "katex/dist/katex.min.css";
 import Demo from "../img/placeholder-vid.mov";
-import placeholder from "../img/placeholder.jpg";
+import collectMeasurment from "../img/usingStella.jpg";
 import MaunalUpload from "../img/ManualUploadFile.png";
 import NDVI from "../img/NDVI.png";
 import SR from "../img/SR.png";
@@ -173,12 +173,12 @@ export default function Docs() {
                 View more videos <a href="https://drive.google.com/drive/u/2/folders/12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8?ths=true&q=sharedwith:public%20parent:12wz5GZQ3PMFtpqhvHb7AVFFuGYD9Lec8" target="_blank" rel="noopener noreferrer">here</a>
             </p>
             { /*example images*/ }
-            <img src={placeholder}/>
-            <img src={MaunalUpload} style={{ marginTop: "250px" }}/>
+            <img src={collectMeasurment} style={{ transform: "scale(0.6)" }} />
+            <img src={MaunalUpload} style={{ marginTop: "150px" }}/>
 
             <div className="empty-container"></div>
 
-            <img src={NDVI} alt="NDVI graph" style={{ marginTop: "1000px" }}/>
+            <img src={NDVI} alt="NDVI graph" style={{ marginTop: "850px" }}/>
             <img src={SR} alt="SR graph" style={{ marginTop: "20px" }}/>
             <img src={DSWI} alt="DSWI graph" style={{ marginTop: "20px" }}/>
             <img src={NIRv} alt="NIRv graph" style={{ marginTop: "20px" }}/>
