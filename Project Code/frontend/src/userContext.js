@@ -9,7 +9,7 @@ export function UserProvider({ children }) {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const res = await fetch("http://localhost:8000/api/users/me", {
+        const res = await fetch("https://stella-backend-qg81.onrender.com/api/users/me", {
           credentials: "include",
         });
 

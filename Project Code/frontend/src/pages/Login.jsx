@@ -18,7 +18,7 @@ function Login({refreshUser}) {
         e.preventDefault();
 
         try {
-            const response = await fetch("http://localhost:8000/api/users/login", {
+            const response = await fetch("https://stella-backend-qg81.onrender.com/api/users/login", {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
