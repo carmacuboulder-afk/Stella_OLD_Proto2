@@ -22,7 +22,7 @@ const evaIcon = new Icon({
   iconSize: [33, 33]
 })
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://stella-backend-qg81.onrender.com/';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://stella-backend-qg81.onrender.com';
 
 let lat = 40.0190; // Boulder Latitude
 let long = -105.2747; // Boulder Longitude
