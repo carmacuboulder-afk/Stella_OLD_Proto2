@@ -10,7 +10,7 @@ export default function Navbar({ loggedIn, setLoggedIn, ownedOrgId, setOwnedOrgI
 
   const handleLogout = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/users/logout", {
+      const response = await fetch("https://stella-backend-qg81.onrender.com/api/users/logout", {
         method: "DELETE",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

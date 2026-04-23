@@ -19,7 +19,7 @@ app.use(express.json());
 
 // Allow our app to call this API, allows setting of cookies
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: "https://stella-iz6h.onrender.com",
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 }));

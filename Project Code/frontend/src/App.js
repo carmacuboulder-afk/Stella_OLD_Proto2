@@ -29,7 +29,7 @@ function App() {
 
   const refreshUser = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/users/me", {
+      const response = await fetch("https://stella-backend-qg81.onrender.com/api/users/me", {
         credentials: "include",
       });
       if (!response.ok) {

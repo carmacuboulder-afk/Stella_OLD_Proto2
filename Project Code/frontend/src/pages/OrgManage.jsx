@@ -22,7 +22,7 @@ function OrgManage({ refreshUser }) {
 
     const fetchManageData = async () => {
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${id}/manage`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${id}/manage`, {
                 credentials: "include",
             });
             if (response.status === 401) { nav("/login"); return; }
@@ -47,7 +47,7 @@ function OrgManage({ refreshUser }) {
 
     const handleAccept = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${id}/accept/${userId}`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${id}/accept/${userId}`, {
                 method: "POST",
                 credentials: "include",
             });
@@ -62,7 +62,7 @@ function OrgManage({ refreshUser }) {
 
     const handleDeny = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${id}/deny/${userId}`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${id}/deny/${userId}`, {
                 method: "POST",
                 credentials: "include",
             });
@@ -77,7 +77,7 @@ function OrgManage({ refreshUser }) {
 
     const handleRemoveMember = async (userId) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${id}/remove/${userId}`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${id}/remove/${userId}`, {
                 method: "DELETE",
                 credentials: "include",
             });
@@ -93,7 +93,7 @@ function OrgManage({ refreshUser }) {
     const handleEdit = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${id}/edit`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${id}/edit`, {
                 method: "PUT",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -114,7 +114,7 @@ function OrgManage({ refreshUser }) {
         if (!transferUserId) return;
         if (!window.confirm("Are you sure you want to transfer ownership? You will lose management access.")) return;
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${id}/transfer/${transferUserId}`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${id}/transfer/${transferUserId}`, {
                 method: "PUT",
                 credentials: "include",
             });
@@ -131,7 +131,7 @@ function OrgManage({ refreshUser }) {
     const handleDelete = async () => {
         if (!window.confirm("Are you sure you want to delete this organization? This cannot be undone.")) return;
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${id}`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${id}`, {
                 method: "DELETE",
                 credentials: "include",
             });

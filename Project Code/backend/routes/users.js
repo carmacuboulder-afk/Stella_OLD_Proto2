@@ -111,6 +111,8 @@ router.post('/login', async (req, res, next) => {
 
       res.cookie('session_id', session_id, {
         httpOnly: true,
+        secure: true,
+        sameSite: 'none',
         maxAge: 1000 * 60 * 60 * 24,
       });
 

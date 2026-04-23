@@ -22,7 +22,7 @@ function Account() {
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const response = await fetch("http://localhost:8000/api/users/me", {
+                const response = await fetch("https://stella-backend-qg81.onrender.com/api/users/me", {
                     credentials: "include",
                 });
                 if (!response.ok) { nav("/login"); return; }
@@ -38,7 +38,7 @@ function Account() {
 
     const handleRemoveSchool = async (school) => {
         try {
-            const response = await fetch("http://localhost:8000/api/users/remove/school", {
+            const response = await fetch("https://stella-backend-qg81.onrender.com/api/users/remove/school", {
                 method: "DELETE",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -60,7 +60,7 @@ function Account() {
         e.preventDefault();
         if (!newSchool.trim()) return;
         try {
-            const response = await fetch("http://localhost:8000/api/users/add/school", {
+            const response = await fetch("https://stella-backend-qg81.onrender.com/api/users/add/school", {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -84,7 +84,7 @@ function Account() {
         if (!orgSearch.trim()) return;
         try {
             const response = await fetch(
-                `http://localhost:8000/api/orgs/search?name=${encodeURIComponent(orgSearch.trim())}`,
+                `https://stella-backend-qg81.onrender.com/api/orgs/search?name=${encodeURIComponent(orgSearch.trim())}`,
                 { credentials: "include" }
             );
             const data = await response.json();
@@ -98,7 +98,7 @@ function Account() {
 
     const handleRequestJoin = async (orgId) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/orgs/${orgId}/request`, {
+            const response = await fetch(`https://stella-backend-qg81.onrender.com/api/orgs/${orgId}/request`, {
                 method: "POST",
                 credentials: "include",
             });

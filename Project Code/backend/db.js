@@ -4,11 +4,11 @@ const { Pool } = pg;
 
 // Create connection pool for PostgreSQL
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || 'dpg-d7j99oqqqhas738d5l20-a',
   port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'stella_user',
-  password: process.env.DB_PASSWORD || 'stella',
-  database: process.env.DB_NAME || 'stella_db',
+  user: process.env.DB_USER || 'postgres_stella_user',
+  password: process.env.DB_PASSWORD || 'Shjo7iElI8KKAgohqH3FWxS4E0ktNiUv',
+  database: process.env.DB_NAME || 'postgres_stella',
   max: 10,
   idleTimeoutMillis: 30000,   // close idle clients after 30s
 });
